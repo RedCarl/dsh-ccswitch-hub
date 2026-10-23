@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "MCP 与技能",
+    "description": "只读引用 CC Switch 的 MCP 服务器与技能，逐个或按类别开关；开启的 MCP 会直接接入 Harness，技能按需出现在技能目录中。"
+  }
+}

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="MCP &amp; Skills">
+  <defs>
+    <linearGradient id="csh-bg" x1="8" y1="5" x2="57" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3B82F6"/>
+      <stop offset="1" stop-color="#4338CA"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="15" fill="url(#csh-bg)"/>
+  <g fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M23 15v9"/>
+    <path d="M37 15v9"/>
+    <path d="M17 24h26v7a13 13 0 0 1-13 13 13 13 0 0 1-13-13v-7Z"/>
+    <path d="M30 44v6"/>
+  </g>
+  <path d="M47 12l1.6 4.4L53 18l-4.4 1.6L47 24l-1.6-4.4L41 18l4.4-1.6L47 12Z" fill="#FDE68A"/>
+  <path d="M15 12l1.1 3L19 16l-2.9 1L15 20l-1.1-3L11 16l2.9-1L15 12Z" fill="#A5F3FC"/>
+</svg>
