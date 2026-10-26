@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Reference CC Switch MCP servers and skills inside DeepSeek Harness, with per-item and category switches.",
+  "description": "Manage MCP servers and skills for DeepSeek Harness, with optional CC Switch compatibility.",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",

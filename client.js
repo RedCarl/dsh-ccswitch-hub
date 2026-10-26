@@ -20,7 +20,7 @@ window.__ModuleLoader__.load({
     const ZH = {
       panelLabel: 'MCP 技能',
       title: 'MCP 与技能',
-      subtitle: '只读引用 CC Switch 的 MCP 服务器与技能。开启的 MCP 会在 Harness 中连接；开启的技能会进入技能目录。',
+      subtitle: '统一管理 MCP 服务器与技能：自动发现本机各工具的配置，按需接入 Harness。CC Switch 是可选来源之一。',
       refresh: '刷新',
       refreshing: '刷新中…',
       masterMcp: '启用 MCP',
@@ -33,19 +33,21 @@ window.__ModuleLoader__.load({
       emptyMcp: '没有发现 MCP 服务器',
       emptySkills: '没有发现技能',
       emptySearch: '没有匹配的条目',
-      emptyHint: '先在 CC Switch 中添加 MCP 或安装技能；也可以展开“高级”指定其他目录。',
-      sourceReady: 'CC Switch 已连接',
-      sourceMissing: '未发现 CC Switch 数据',
-      sourceOther: '仅发现其他来源',
+      emptyHint: '在 CC Switch、Claude Code、Codex 或 Gemini CLI 中配置 MCP / 技能后会自动出现；也可以展开“高级”添加技能目录。',
+      sourceReady: '来源已就绪',
+      sourceMissing: '未发现来源',
       warnings: '提示',
       advanced: '高级',
-      ccSwitchDir: 'CC Switch 目录',
+      ccSwitchDir: 'CC Switch 目录（兼容）',
       ccSwitchDirHint: '留空使用默认的 ~/.cc-switch',
       skillDirs: '额外技能目录',
       skillDirsHint: '每行一个目录；用于扫描 CC Switch 之外的技能',
       saveConfig: '保存并重新扫描',
       saving: '保存中…',
       savedConfig: '已保存，正在重新扫描。',
+      sourcesTitle: '来源状态',
+      sourceEmpty: '未发现',
+      itemsCount: '项',
       stateFile: '状态文件',
       dbPath: '数据库',
       agentsPath: '共享技能目录',
@@ -88,7 +90,7 @@ window.__ModuleLoader__.load({
     const EN = {
       panelLabel: 'MCP Skills',
       title: 'MCP & Skills',
-      subtitle: 'Reference CC Switch MCP servers and skills read-only. Enabled MCP servers connect inside Harness; enabled skills join the skill catalog.',
+      subtitle: 'Manage MCP servers and skills in one place. Discover definitions from local tool configs and enable what you need. CC Switch is one optional source.',
       refresh: 'Refresh',
       refreshing: 'Refreshing…',
       masterMcp: 'Enable MCP',
@@ -101,19 +103,21 @@ window.__ModuleLoader__.load({
       emptyMcp: 'No MCP servers found',
       emptySkills: 'No skills found',
       emptySearch: 'No matching items',
-      emptyHint: 'Add MCP servers or install skills in CC Switch first; use Advanced to point at another directory.',
-      sourceReady: 'CC Switch connected',
-      sourceMissing: 'No CC Switch data found',
-      sourceOther: 'Other sources only',
+      emptyHint: 'Configure MCP servers or install skills in CC Switch, Claude Code, Codex, or Gemini CLI; use Advanced to add another skill directory.',
+      sourceReady: 'Sources ready',
+      sourceMissing: 'No sources found',
       warnings: 'Notes',
       advanced: 'Advanced',
-      ccSwitchDir: 'CC Switch directory',
+      ccSwitchDir: 'CC Switch directory (compatibility)',
       ccSwitchDirHint: 'Leave blank for the default ~/.cc-switch',
       skillDirs: 'Extra skill directories',
       skillDirsHint: 'One directory per line; used for skills outside CC Switch',
       saveConfig: 'Save and rescan',
       saving: 'Saving…',
       savedConfig: 'Saved; rescanning now.',
+      sourcesTitle: 'Sources',
+      sourceEmpty: 'Not found',
+      itemsCount: 'items',
       stateFile: 'State file',
       dbPath: 'Database',
       agentsPath: 'Shared skills directory',
@@ -220,6 +224,11 @@ window.__ModuleLoader__.load({
       .csh-advanced { margin-top: 16px; }
       .csh-advanced summary { cursor: pointer; font-size: 13px; color: var(--dsw-alias-label-secondary); user-select: none; }
       .csh-advanced summary:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; border-radius: 4px; }
+      .csh-source-list { display: flex; flex-direction: column; margin-top: 6px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 8px; overflow: hidden; }
+      .csh-source-row { display: grid; grid-template-columns: 138px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 7px 10px; border-bottom: 1px solid var(--dsw-alias-border-l1); font-size: 11.5px; }
+      .csh-source-row:last-child { border-bottom: 0; }
+      .csh-source-name { font-weight: 500; }
+      .csh-source-path { color: var(--dsw-alias-label-secondary); word-break: break-all; }
       .csh-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 14px; }
       .csh-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
       .csh-field.wide { grid-column: 1 / -1; }
@@ -237,6 +246,8 @@ window.__ModuleLoader__.load({
         .csh-head-actions { justify-content: flex-start; }
         .csh-row { grid-template-columns: minmax(0, 1fr); }
         .csh-side { flex-direction: row; align-items: center; justify-content: space-between; min-width: 0; }
+        .csh-source-row { grid-template-columns: minmax(0, 1fr) auto; }
+        .csh-source-path { grid-column: 1 / -1; }
       }
     `
 
@@ -539,9 +550,6 @@ window.__ModuleLoader__.load({
               : `${item.name} ${item.description ?? ''} ${item.path ?? ''}`
             return haystack.toLowerCase().includes(needle)
           })
-      const ccSource = (snapshot.sources ?? []).find((source) => source.id === 'ccswitch' && source.kind === 'mcp')
-      const ccSkills = (snapshot.sources ?? []).find((source) => source.id === 'ccswitch' && source.kind === 'skills')
-      const sourceFound = Boolean((ccSource && ccSource.exists) || (ccSkills && ccSkills.exists))
       const anySource = (snapshot.sources ?? []).some((source) => source.exists)
       const enabledMcp = snapshot.mcp.items.filter((item) => item.enabled).length
       const enabledSkills = snapshot.skills.items.filter((item) => item.enabled).length
@@ -556,7 +564,7 @@ window.__ModuleLoader__.load({
               h('p', { className: 'csh-sub' }, tr('subtitle')),
             ),
             h('div', { className: 'csh-head-actions' },
-              h(Badge, { tone: sourceFound ? 'ok' : 'warn' }, sourceFound ? tr('sourceReady') : anySource ? tr('sourceOther') : tr('sourceMissing')),
+              h(Badge, { tone: anySource ? 'ok' : 'warn' }, anySource ? tr('sourceReady') : tr('sourceMissing')),
               h('button', {
                 type: 'button',
                 className: 'csh-btn',
@@ -675,8 +683,19 @@ window.__ModuleLoader__.load({
                   h('div', { className: 'csh-note' }, tr('skillDirsHint')),
                 ),
                 h('div', { className: 'csh-field wide' },
-                  h('div', { className: 'csh-note' }, `${tr('dbPath')}: ${snapshot.resolved?.ccSwitchDb ?? '—'}`),
-                  h('div', { className: 'csh-note' }, `${tr('agentsPath')}: ${snapshot.resolved?.agentsSkills ?? '—'}`),
+                  h('div', { className: 'csh-label' }, tr('sourcesTitle')),
+                  h('div', { className: 'csh-source-list' },
+                    (snapshot.sources ?? []).map((source) => h('div', {
+                      key: `${source.kind}:${source.id}`,
+                      className: 'csh-source-row',
+                    },
+                      h('span', { className: 'csh-source-name' }, source.label),
+                      h('span', { className: 'csh-source-path csh-code' }, source.path),
+                      source.shadow ? h(Badge, { tone: 'warn' }, tr('readonly')) : null,
+                      h('span', { className: `csh-badge${source.exists ? ' ok' : ''}` },
+                        source.exists ? `${source.count ?? 0} ${tr('itemsCount')}` : tr('sourceEmpty')),
+                    )),
+                  ),
                 ),
                 h('div', { className: 'csh-save-row' },
                   h('span', { className: 'csh-save-note' }, saveNote),

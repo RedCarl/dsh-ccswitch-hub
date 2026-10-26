@@ -1,6 +1,7 @@
 /**
- * @local/dsh-ccswitch-hub — reference CC Switch's MCP servers and skills
- * inside DeepSeek Harness, with per-item and category switches.
+ * @local/dsh-ccswitch-hub — manage MCP servers and skills inside DeepSeek
+ * Harness, with per-item and category switches. CC Switch is one optional
+ * source among the local tool configurations this Host half reads.
  *
  * Host half:
  * - reads CC Switch / Claude Code / Codex / Gemini CLI MCP definitions;

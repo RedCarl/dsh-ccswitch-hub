@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "MCP & Skills",
-    "description": "Reference CC Switch MCP servers and skills read-only, with per-item and category switches. Enabled MCP servers connect inside Harness; enabled skills join the skill catalog on demand."
+    "description": "Manage the Harness MCP servers and skills in one place. Discover entries from CC Switch, Claude Code, Codex, and Gemini CLI, enable what you need, and keep the choices. CC Switch is one optional source."
   }
 }
