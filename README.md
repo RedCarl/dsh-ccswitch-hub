@@ -4,6 +4,20 @@ DeepSeek Harness 的 **MCP 服务器与技能管理器**：把本机各工具里
 
 > 兼容 [CC Switch](https://github.com/farion1231/cc-switch)，但 CC Switch 只是一个可选来源，不是本插件的唯一用途。
 
+## 安装（无需 npm）
+
+直接从 GitHub 安装（推荐）：
+
+```sh
+dsh plugin --profile web add https://github.com/RedCarl/dsh-ccswitch-hub
+```
+
+也可以在 DSH 的「设置 → 插件」中粘贴这个 GitHub 地址；安装后刷新页面。
+
+离线或锁定版本时，从 [GitHub Releases](https://github.com/RedCarl/dsh-ccswitch-hub/releases) 下载 `*.tgz`，在安装框中粘贴本地绝对路径。
+
+> 不需要 npmjs 账号；本插件通过 GitHub 仓库和 GitHub Release 分发。
+
 ## 核心能力
 
 - **统一发现**：同时读取 CC Switch、Claude Code、Codex、Gemini CLI 的 MCP 配置和技能目录。
@@ -68,4 +82,13 @@ DeepSeek Harness 的 **MCP 服务器与技能管理器**：把本机各工具里
 ```bash
 node --check index.js client.js lib/*.js
 node --test
+```
+
+## 发布
+
+推送 `v*` 标签会触发 GitHub Actions：`npm pack` 生成 `.tgz` 并上传到对应的 GitHub Release。发布新版本时先更新 `package.json` 的 `version`，提交后：
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
 ```

@@ -1,9 +1,9 @@
 {
   "name": "@local/dsh-ccswitch-hub",
   "version": "1.0.0",
-  "private": true,
   "type": "module",
   "description": "Manage MCP servers and skills for DeepSeek Harness, with optional CC Switch compatibility.",
+  "main": "index.js",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
@@ -18,6 +18,26 @@
     "locale/*.json",
     "icon.svg",
     "README.md"
+  ],
+  "author": {
+    "name": "RedCarl"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RedCarl/dsh-ccswitch-hub.git"
+  },
+  "homepage": "https://github.com/RedCarl/dsh-ccswitch-hub",
+  "bugs": {
+    "url": "https://github.com/RedCarl/dsh-ccswitch-hub/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "cordis",
+    "mcp",
+    "skills",
+    "cc-switch"
   ],
   "dsh": {
     "bundle": {
