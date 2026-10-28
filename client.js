@@ -108,7 +108,7 @@ window.__ModuleLoader__.load({
       currentVersion: '当前',
       releaseNotes: 'Release 说明',
       updateApplied: '更新已应用，请刷新页面。',
-      updateRestart: '更新已安装，需要重启 Harness。',
+      updateRestart: '更新已安装，需要重启 Harness 后生效。',
       updateOverridden: '更新已安装，但当前入口被更高优先级配置覆盖。',
       updateCancelled: '更新已取消。',
       updateFailed: '更新失败',
@@ -220,7 +220,7 @@ window.__ModuleLoader__.load({
       currentVersion: 'Current',
       releaseNotes: 'Release notes',
       updateApplied: 'Update applied; refresh the page.',
-      updateRestart: 'Update installed; Harness must be restarted.',
+      updateRestart: 'Update installed; restart Harness to use it.',
       updateOverridden: 'Update installed, but a higher-priority entry overrides this one.',
       updateCancelled: 'Update cancelled.',
       updateFailed: 'Update failed',
@@ -692,9 +692,10 @@ window.__ModuleLoader__.load({
           const payload = await requestJson(`${API}/update`, { method: 'POST', body: '{}' })
           if (payload.ok !== true) throw new Error(payload.result?.error ?? payload.error ?? tr('updateFailed'))
           const application = payload.result?.application
-          const installed = payload.result?.version
-          if (application === 'restart-required') {
-            setUpdateNote(`${tr('updateRestart')}${payload.result?.restartReason ? ` ${reasonText(payload.result.restartReason)}` : ''}`)
+          const installed = payload.result?.installedVersion ?? payload.result?.version
+          const reloadRequired = payload.result?.reloadRequired === true || application === 'restart-required'
+          if (reloadRequired) {
+            setUpdateNote(`${tr('updateRestart')}${installed ? ` (v${installed})` : ''}${payload.result?.restartReason ? ` ${reasonText(payload.result.restartReason)}` : ''}`)
           } else if (application === 'overridden') {
             setUpdateNote(tr('updateOverridden'))
           } else if (application === 'cancelled') {
@@ -708,7 +709,7 @@ window.__ModuleLoader__.load({
             current: installed ?? current.current,
             latest: installed ?? current.latest,
           })
-          if (application === 'applied') {
+          if (application === 'applied' && !reloadRequired) {
             clearTimeout(updateTimer.current)
             updateTimer.current = setTimeout(() => { void load() }, 1200)
           }

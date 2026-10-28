@@ -511,6 +511,11 @@ export function apply(ctx, rawConfig) {
       const failure = result?.error
         ? (typeof result.error.message === 'string' ? result.error.message : truncate(JSON.stringify(result.error), 600))
         : undefined
+      const installedVersion = typeof result?.version === 'string'
+        ? result.version
+        : readPackageVersion(import.meta.url)
+      const reloadRequired = application === 'restart-required'
+        || compareVersions(installedVersion, PLUGIN_VERSION) > 0
       sendJson(res, 200, {
         ok: application !== 'failed' && application !== 'cancelled',
         current: PLUGIN_VERSION,
@@ -519,6 +524,8 @@ export function apply(ctx, rawConfig) {
           application,
           stage: result?.stage,
           version: result?.version,
+          installedVersion,
+          reloadRequired,
           restartReason: result?.restartReason,
           warnings: result?.warnings,
           pendingBuilds: result?.pendingBuilds,
