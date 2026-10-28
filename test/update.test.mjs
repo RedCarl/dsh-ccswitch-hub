@@ -10,6 +10,7 @@ import {
   isNewer,
   parseVersion,
   readPackageVersion,
+  releaseTarballAsset,
 } from '../lib/update.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -48,6 +49,10 @@ test('fetches the latest release and truncates notes', async () => {
             html_url: 'https://github.com/RedCarl/dsh-ccswitch-hub/releases/tag/v2.2.0',
             published_at: '2026-10-28T00:00:00Z',
             body: 'x'.repeat(5000),
+            assets: [
+              { name: 'local-dsh-ccswitch-hub-2.2.0.tgz', browser_download_url: 'https://github.com/RedCarl/dsh-ccswitch-hub/releases/download/v2.2.0/local-dsh-ccswitch-hub-2.2.0.tgz', size: 1234 },
+              { name: 'source.zip', browser_download_url: 'https://github.com/RedCarl/dsh-ccswitch-hub/archive/v2.2.0.zip' },
+            ],
           }
         },
       }
@@ -59,6 +64,10 @@ test('fetches the latest release and truncates notes', async () => {
   assert.equal(result.tag, 'v2.2.0')
   assert.equal(result.url.includes('/releases/tag/v2.2.0'), true)
   assert.equal(result.notes.length, 4000)
+  assert.equal(result.assets.length, 2)
+  assert.equal(result.assets[0].size, 1234)
+  assert.equal(releaseTarballAsset(result).name, 'local-dsh-ccswitch-hub-2.2.0.tgz')
+  assert.equal(releaseTarballAsset({ assets: [{ name: 'x.zip', url: 'u' }] }), null)
 })
 
 test('reports GitHub failures and timeouts', async () => {

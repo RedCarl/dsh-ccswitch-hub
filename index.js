@@ -13,7 +13,7 @@ import { McpRuntime, runtimeServerName, summarizeMcp } from './lib/mcp.js'
 import { deleteSkill, importSkill, scanSkills, setSkillEnabled } from './lib/native-skills.js'
 import { resolvePaths, stringValue } from './lib/paths.js'
 import { defaultState, loadState, saveState, setCcSwitchDir } from './lib/state.js'
-import { REPO_URL, compareVersions, fetchLatestRelease, readPackageVersion } from './lib/update.js'
+import { REPO_URL, compareVersions, fetchLatestRelease, readPackageVersion, releaseTarballAsset } from './lib/update.js'
 import { errorMessage, isRecord, truncate } from './lib/util.js'
 
 /** Loader entry name used by diagnostics. */
@@ -504,7 +504,8 @@ export function apply(ctx, rawConfig) {
       const info = await updateInfo(true)
       if (info.ok !== true) throw new Error(info.error ?? '检查更新失败')
       if (info.updateAvailable !== true) throw new Error(`已是最新版本 v${info.current}`)
-      const result = await manager.installBundle(REPO_URL, { saveExact: false })
+      const asset = releaseTarballAsset(info.release)
+      const result = await manager.installBundle(asset?.url ?? REPO_URL, { saveExact: false })
       updateCache = { at: 0, info: null }
       const application = typeof result?.application === 'string' ? result.application : 'unknown'
       const failure = result?.error

@@ -99,6 +99,6 @@ node --test
 推送 `v*` 标签会触发 GitHub Actions：`npm pack` 生成 `.tgz` 并上传到对应的 GitHub Release。发布新版本时先更新 `package.json` 的 `version`，提交后：
 
 ```bash
-git tag v2.1.0
-git push origin v2.1.0
+git tag v2.1.1
+git push origin v2.1.1
 ```
