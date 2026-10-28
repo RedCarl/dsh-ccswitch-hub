@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "MCP & Skills",
-    "description": "Manage the Harness MCP servers and skills in one place. Discover entries from CC Switch, Claude Code, Codex, and Gemini CLI, enable what you need, and keep the choices. CC Switch is one optional source."
+    "description": "Create, edit, and toggle Harness-native MCP servers and skills. Optionally import independent copies from CC Switch; imported entries no longer depend on it."
   }
 }

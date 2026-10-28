@@ -1,8 +1,12 @@
 # MCP 与技能
 
-DeepSeek Harness 的 **MCP 服务器与技能管理器**：把本机各工具里的 MCP 定义和技能目录聚合到一个页面，按需接入当前 Harness。
+DeepSeek Harness 的 **原生 MCP 服务器与技能管理器**：
 
-> 兼容 [CC Switch](https://github.com/farion1231/cc-switch)，但 CC Switch 只是一个可选来源，不是本插件的唯一用途。
+- 在面板里新增、编辑、删除、启停 Harness 自己的 MCP 服务器；
+- 管理 `$DSH_HOME/skills` 下的原生技能，支持启停和删除（可恢复）；
+- 额外提供 **从 CC Switch 导入**：只读取 CC Switch 的 MCP 与技能，导入后复制为 Harness 的独立条目。
+
+> CC Switch 只是可选的导入来源，不是本插件的主要功能。本插件不会读取 Claude Code、Codex 或 Gemini CLI 的 MCP/技能。
 
 ## 安装（无需 npm）
 
@@ -18,62 +22,68 @@ dsh plugin --profile web add https://github.com/RedCarl/dsh-ccswitch-hub
 
 > 不需要 npmjs 账号；本插件通过 GitHub 仓库和 GitHub Release 分发。
 
-## 核心能力
+## 自动检查更新
 
-- **统一发现**：同时读取 CC Switch、Claude Code、Codex、Gemini CLI 的 MCP 配置和技能目录。
-- **统一开关**：MCP 与技能各有一个总开关，每个条目还有独立开关；关闭总开关不会丢失逐项选择。
-- **运行时接入**：
-  - 启用的 MCP 通过 DSH 自带的 `@deepseek-ai/dsh-mcp-client` 动态挂载，工具名形如 `mcp__<server>__<tool>`。
-  - 启用的技能注册为 `ctx.skills` 提供方，下一次模型步骤进入技能目录。
-- **持久化**：选择保存在 `$DSH_HOME/ccswitch-hub/state.json`，重启后恢复。
-- **只读来源**：不修改 CC Switch、Claude、Codex、Gemini 的配置或技能目录。
-- **即时生效**：打开/关闭后无需重启 Harness。
+页面右上角会显示 **检查更新** 按钮：
+
+- 打开页面时自动检查一次 GitHub Release，5 分钟内复用结果；
+- 有新版本时显示版本号和 Release 链接，可 **一键更新**；
+- 更新通过 Host 的插件管理器执行，可能立即生效，也可能提示需要重启 Harness；
+- 如果当前 Host 没有插件管理器（例如 TUI），会提示在终端手动安装。
+
+更新只针对本仓库的 GitHub 发布：
+
+```sh
+dsh plugin --profile web add https://github.com/RedCarl/dsh-ccswitch-hub
+```
 
 ## 打开方式
 
-安装后刷新 Web 页面，点击左侧栏的 **MCP 技能** 图标。页面分为：
+安装后刷新 Web 页面，点击左侧栏的 **MCP 技能** 图标。页面有三个标签：
 
-- **MCP 服务器**：显示来源、传输方式、工具前缀、连接状态和工具数量。
-- **技能**：显示名称、描述、来源目录；已启用且进入技能目录的会标记为「已进入技能目录」。
-- **高级**：可以修改 CC Switch 目录和额外技能目录，保存后自动重新扫描。
+### MCP 服务器
 
-## 支持的来源
+- **新增 / 编辑 / 删除**：配置名称、传输方式（stdio 或 HTTP）、命令、参数、环境变量、工作目录或 URL、请求头、调用超时。
+- **总开关 + 逐项开关**：关闭总开关会断开所有 MCP，但保留每个服务器的启用选择。
+- 启用的服务器通过 DSH 自带的 `@deepseek-ai/dsh-mcp-client` 动态挂载，工具名形如 `mcp__<server>__<tool>`。
+- 支持连接失败重试；状态、工具数量、错误会直接显示在行内。
+- 环境变量/请求头的值只保存在 Host（`state.json`，权限 `0600`），列表和编辑接口不会回显已保存的值；编辑时留空表示保留，删除整行表示移除。
 
-| 来源 | 默认路径 | 说明 |
-|---|---|---|
-| CC Switch 数据库 | `~/.cc-switch/cc-switch.db` | 读取 `mcp_servers` 表，只读 |
-| CC Switch 技能 | `~/.cc-switch/skills` | 作为技能来源之一 |
-| Claude Code | `~/.claude.json` 的 `mcpServers`、`~/.claude/skills` | MCP + 技能 |
-| Codex | `~/.codex/config.toml` 的 `[mcp_servers.*]`、`~/.codex/skills` | MCP + 技能 |
-| Gemini CLI | `~/.gemini/settings.json` 的 `mcpServers`、`~/.gemini/skills` | MCP + 技能 |
-| 共享技能 | `~/.agents/skills` | 只读展示，见下方限制 |
-| 额外技能目录 | 页面「高级」中配置 | 用于上述位置之外的技能 |
+### 技能
 
-同名 MCP 服务器会合并成一行，CC Switch 数据库中的配置优先；不同来源配置不一致时页面会提示。技能按目录优先级去重：CC Switch → Claude → Codex → Gemini → 额外目录。
+- 管理 `$DSH_HOME/skills` 下的技能（目录形式的 `SKILL.md`，或单个 `.md` 文件）。
+- **启用/停用**：停用会把技能移到 `$DSH_HOME/ccswitch-hub/disabled-skills/`，启用时移回；Harness 的代理预设只扫描 `$DSH_HOME/skills`，所以切换会真正生效。
+- **删除**：移动到 `$DSH_HOME/ccswitch-hub/trash/skills/`，不会立即永久删除。
+- 共享目录 `~/.agents/skills` 和项目级技能不在此面板管理，仍由 Harness 自身发现。
 
-## 与 CC Switch 的关系
+### 从 CC Switch 导入
 
-- 仅做**兼容读取**：CC Switch 的数据是来源之一，和 Claude Code、Codex、Gemini CLI 地位相同。
-- 不写入 CC Switch 的数据库、配置或技能目录。
-- 包名、仓库名和状态目录沿用 `ccswitch-hub`，这是为了保持已安装 profile 的路径和状态兼容；展示层是通用的 MCP 与技能管理器。
+- 只读取 `~/.cc-switch/cc-switch.db` 的 `mcp_servers` 表和 `~/.cc-switch/skills/`。
+- **导入 MCP**：复制为 Harness 的原生 MCP 条目，默认关闭；导入后可以单独编辑、启停、删除，不再依赖 CC Switch。
+- **导入技能**：复制到 `$DSH_HOME/skills/`，成为独立副本。
+- 同名条目会显示冲突并拒绝覆盖；SSE 服务器会标记为 Harness 不支持。
+- 数据库和技能目录只读，不会修改 CC Switch 的数据。
 
-## 安全
+## 数据与路径
 
-- 浏览器只拿到环境变量和请求头的**键名**，不包含值；stdio 摘要不显示参数内容，HTTP 摘要去掉查询串。
-- 状态文件只保存开关和目录覆盖，权限为 `0600`。
-- 所有运行时操作都在 Host 侧完成，密钥不进入页面。
+| 内容 | 路径 |
+|---|---|
+| 原生 MCP 定义（含环境变量/请求头） | `$DSH_HOME/ccswitch-hub/state.json` |
+| 原生技能 | `$DSH_HOME/skills` |
+| 停用的技能 | `$DSH_HOME/ccswitch-hub/disabled-skills` |
+| 删除的技能（回收） | `$DSH_HOME/ccswitch-hub/trash/skills` |
+| CC Switch 导入来源 | `~/.cc-switch`（可在「高级」中修改） |
+
+状态文件权限为 `0600`。浏览器只拿到环境变量/请求头的键名，不包含值；MCP 参数会在编辑时回显，因此不要把密钥放在参数里，优先使用环境变量或请求头。
 
 ## 已知限制
 
-- **SSE**：Harness 的 MCP 桥接不支持 SSE，这类服务器会列出但开关保持禁用。请改用 HTTP 或 stdio。
-- **`~/.agents/skills` 与 `$DSH_HOME/skills`**：Harness 的代理预设会直接扫描这两个目录，其中的技能只能只读展示，无法通过本面板隐藏。若希望 CC Switch 技能可独立开关，请让 CC Switch 使用默认存储 `~/.cc-switch/skills`。
-- **只读管理**：当前版本聚焦发现、开关与接入，不在页面内新建或编辑 MCP/技能；原有配置仍在各自工具中维护。
-- **作用范围**：开关是当前 profile 全局生效，不是按会话或按代理预设。
-- **远程 MCP 鉴权**：只传递来源中已配置的 env/headers，不处理 OAuth 登录流程。
-
-## 状态与卸载
-
-状态保存在 `$DSH_HOME/ccswitch-hub/state.json`。卸载插件（或在插件管理中停用）会断开所有由本插件挂载的 MCP 服务器，并移除技能提供方；来源数据不受影响。删除该状态目录可重置所有开关。
+- **SSE**：Harness 的 MCP 桥接不支持 SSE，CC Switch 中的 SSE 服务器会显示但不能导入。
+- **技能启停依赖目录移动**：不要在其他地方同时移动 `$DSH_HOME/skills` 中的条目，否则面板状态会以实际目录为准。
+- **导入是复制**：CC Switch 后续更新不会自动同步；需要时重新导入（同名默认拒绝覆盖）。
+- **CC Switch 技能存储位置**：导入页默认读取 `~/.cc-switch/skills`；如果 CC Switch 使用 `~/.agents/skills` 作为存储位置，本插件不会自动发现这些技能。
+- **作用范围**：MCP 开关是当前 profile 全局生效；技能目录属于当前 `DSH_HOME`。
+- **远程 MCP 鉴权**：只传递你填写的 env/headers，不处理 OAuth 登录流程。
 
 ## 开发
 
@@ -89,6 +99,6 @@ node --test
 推送 `v*` 标签会触发 GitHub Actions：`npm pack` 生成 `.tgz` 并上传到对应的 GitHub Release。发布新版本时先更新 `package.json` 的 `version`，提交后：
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v2.1.0
+git push origin v2.1.0
 ```

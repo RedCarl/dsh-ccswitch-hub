@@ -1,7 +1,6 @@
-# MCP & skills manager: aggregate local tool configs and CC Switch entries,
-# then enable them inside this profile. The Host half owns the source readers,
-# runtime MCP mounts, the skills provider, and /plugins/ccswitch-hub/*; the
-# Client half is the sidebar page.
+# Native MCP & skills manager: store MCP servers, manage the Harness skills
+# directory, and optionally import copies from CC Switch. The Host half owns
+# the API, MCP mounts, and filesystem changes; the Client half is the page.
 - insert:
     - id: ccswitch-hub
       name: '@local/dsh-ccswitch-hub'

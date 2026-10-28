@@ -1,9 +1,10 @@
 /**
  * Client half of @local/dsh-ccswitch-hub.
  *
- * A left-sidebar entry opens one management page: MCP servers and skills
- * discovered from CC Switch, with category and per-item switches. All text is
- * localized and all styling uses host theme tokens.
+ * A left-sidebar entry opens one management page:
+ * - MCP servers stored by this plugin and mounted in Harness;
+ * - native skills under `$DSH_HOME/skills`, with enable/disable and delete;
+ * - a separate CC Switch import tab that copies entries into Harness.
  */
 window.__ModuleLoader__.load({
   id: '@local/dsh-ccswitch-hub',
@@ -13,158 +14,240 @@ window.__ModuleLoader__.load({
 
     const NS = 'ccswitch-hub'
     const PANEL_ID = 'ccswitch-hub'
-    const STATE_ROUTE = '/plugins/ccswitch-hub/state'
-    const ACTION_ROUTE = '/plugins/ccswitch-hub/action'
-    const CONFIG_ROUTE = '/plugins/ccswitch-hub/config'
+    const API = '/plugins/ccswitch-hub'
 
     const ZH = {
       panelLabel: 'MCP 技能',
       title: 'MCP 与技能',
-      subtitle: '统一管理 MCP 服务器与技能：自动发现本机各工具的配置，按需接入 Harness。CC Switch 是可选来源之一。',
-      refresh: '刷新',
-      refreshing: '刷新中…',
-      masterMcp: '启用 MCP',
-      masterSkills: '启用技能',
-      masterOff: '总开关已关闭，已启用的条目不会加载。',
+      subtitle: '管理 Harness 自己的 MCP 服务器与技能。CC Switch 仅作为导入来源，导入后即成为独立的 Harness 条目。',
       tabMcp: 'MCP 服务器',
       tabSkills: '技能',
+      tabImport: '从 CC Switch 导入',
+      refresh: '刷新',
+      refreshing: '刷新中…',
+      addMcp: '新增 MCP',
+      edit: '编辑',
+      delete: '删除',
+      confirmDelete: '确认删除',
+      cancel: '取消',
+      save: '保存',
+      saving: '保存中…',
+      masterMcp: '启用 MCP',
+      masterNote: '关闭后保留每个服务器的启用选择。',
+      masterOff: 'MCP 总开关已关闭，已启用的服务器不会连接。',
       searchMcp: '搜索 MCP 服务器…',
       searchSkills: '搜索技能…',
-      emptyMcp: '没有发现 MCP 服务器',
-      emptySkills: '没有发现技能',
+      emptyMcp: '还没有 MCP 服务器',
+      emptyMcpHint: '点击「新增 MCP」添加，或在「从 CC Switch 导入」中复制已有配置。',
+      emptySkills: '还没有技能',
+      emptySkillsHint: '把技能放到 Harness 技能目录，或从 CC Switch 导入。',
       emptySearch: '没有匹配的条目',
-      emptyHint: '在 CC Switch、Claude Code、Codex 或 Gemini CLI 中配置 MCP / 技能后会自动出现；也可以展开“高级”添加技能目录。',
-      sourceReady: '来源已就绪',
-      sourceMissing: '未发现来源',
-      warnings: '提示',
-      advanced: '高级',
-      ccSwitchDir: 'CC Switch 目录（兼容）',
-      ccSwitchDirHint: '留空使用默认的 ~/.cc-switch',
-      skillDirs: '额外技能目录',
-      skillDirsHint: '每行一个目录；用于扫描 CC Switch 之外的技能',
-      saveConfig: '保存并重新扫描',
-      saving: '保存中…',
-      savedConfig: '已保存，正在重新扫描。',
-      sourcesTitle: '来源状态',
-      sourceEmpty: '未发现',
-      itemsCount: '项',
-      stateFile: '状态文件',
-      dbPath: '数据库',
-      agentsPath: '共享技能目录',
-      tools: '个工具',
       statusOff: '未连接',
       statusConnecting: '连接中…',
       statusReady: '已连接',
       statusError: '连接失败',
-      statusUnsupported: '不支持',
-      statusMissing: '来源已移除',
       pending: '等待连接',
       retry: '重试',
-      enabled: '已启用',
-      disabled: '未启用',
-      readonly: '只读',
-      inRegistry: '已进入技能目录',
-      notInRegistry: '尚未进入技能目录',
-      source: '来源',
-      apps: '同步到',
+      native: 'Harness',
+      importedFrom: '导入自 CC Switch',
       envKeys: '环境变量',
       headerKeys: '请求头',
-      conflict: '多来源配置不一致',
+      tools: '个工具',
+      mcpName: '名称',
+      transport: '传输方式',
+      command: '命令',
+      args: '参数（每行一个）',
+      env: '环境变量（KEY=value，每行一个）',
+      cwd: '工作目录（可选）',
+      url: 'MCP 地址',
+      headers: '请求头（KEY=value，每行一个）',
+      timeout: '调用超时（毫秒）',
+      stdio: 'stdio（本地进程）',
+      http: 'HTTP',
+      secretHint: '已保存的环境变量/请求头值不会回显；留空表示保留原值，删除整行表示移除。',
+      enabled: '启用',
+      disabled: '已停用',
+      skillEnabled: '已启用',
+      skillDisabled: '已停用',
+      deleteSkill: '删除技能',
+      skillDeleted: '技能已移到回收目录。',
+      mcpDeleted: 'MCP 服务器已删除。',
+      importTitle: '从 CC Switch 导入',
+      importSubtitle: '只读取 CC Switch 的数据，导入时复制为 Harness 的独立条目；之后可以单独编辑、启停或删除。',
+      importMcpTitle: 'MCP 服务器',
+      importSkillsTitle: '技能',
+      importOne: '导入',
+      importAll: '全部导入',
+      imported: '已导入',
+      importConflict: '同名条目已存在',
+      importUnsupported: 'Harness 不支持',
+      importInstalled: '已安装',
+      importEmpty: '没有可导入的条目',
+      importHint: '未发现 CC Switch 数据；可以在下方「高级」中指定 CC Switch 目录。',
+      importRefresh: '重新扫描',
+      importNote: '导入的 MCP 默认关闭，导入后请在 MCP 页启用。',
+      ccSwitchDir: 'CC Switch 目录（导入来源）',
+      ccSwitchDirHint: '留空使用默认的 ~/.cc-switch；只影响导入，不影响 Harness 自带条目。',
+      dbFound: '数据库已找到',
+      dbMissing: '数据库未找到',
+      skillsFound: '技能目录已找到',
+      skillsMissing: '技能目录未找到',
+      skillsDir: 'Harness 技能目录',
+      disabledDir: '停用技能目录',
+      dbPath: 'CC Switch 数据库',
+      stateFile: '状态文件',
+      advanced: '高级 / 路径',
+      saveConfig: '保存并重新扫描',
+      savedConfig: '已保存。',
+      checkUpdate: '检查更新',
+      checkingUpdate: '检查中…',
+      updateTo: '更新到',
+      updating: '更新中…',
+      upToDate: '已是最新',
+      newVersion: '发现新版本',
+      currentVersion: '当前',
+      releaseNotes: 'Release 说明',
+      updateApplied: '更新已应用，请刷新页面。',
+      updateRestart: '更新已安装，需要重启 Harness。',
+      updateOverridden: '更新已安装，但当前入口被更高优先级配置覆盖。',
+      updateCancelled: '更新已取消。',
+      updateFailed: '更新失败',
+      updateUnsupported: '当前 Host 不支持一键更新，请在终端手动安装。',
+      warnings: '提示',
       loadFailed: '无法读取状态',
       retryLoad: '重新加载',
       actionFailed: '操作失败',
-      missingRow: '该条目已不在来源中；关闭开关可清理。',
-      configNone: '默认',
-      descriptionEmpty: '（无描述）',
-      openAdvanced: '来源与路径',
-      mcpCount: 'MCP',
-      skillCount: '技能',
+      countMcp: 'MCP',
+      countSkills: '技能',
       enabledCount: '已启用',
-      masterNote: '关闭后保留每个条目的选择。',
       noDescription: '（无描述）',
-      problem: '问题',
-      sourceShadow: '由 Harness 直接加载',
-      pathLabel: '路径',
+      deleteTrashNote: '删除的技能会移动到回收目录，不会立即永久删除。',
+      importSuccess: '导入完成。',
+      importAllErrors: '部分条目未导入',
+      formError: '请检查表单',
+      toggleSkill: '启用/停用技能',
     }
 
     const EN = {
       panelLabel: 'MCP Skills',
       title: 'MCP & Skills',
-      subtitle: 'Manage MCP servers and skills in one place. Discover definitions from local tool configs and enable what you need. CC Switch is one optional source.',
-      refresh: 'Refresh',
-      refreshing: 'Refreshing…',
-      masterMcp: 'Enable MCP',
-      masterSkills: 'Enable skills',
-      masterOff: 'The master switch is off; enabled items will not load.',
+      subtitle: 'Manage Harness’s own MCP servers and skills. CC Switch is only an import source; imported entries become independent Harness items.',
       tabMcp: 'MCP servers',
       tabSkills: 'Skills',
+      tabImport: 'Import from CC Switch',
+      refresh: 'Refresh',
+      refreshing: 'Refreshing…',
+      addMcp: 'New MCP',
+      edit: 'Edit',
+      delete: 'Delete',
+      confirmDelete: 'Confirm delete',
+      cancel: 'Cancel',
+      save: 'Save',
+      saving: 'Saving…',
+      masterMcp: 'Enable MCP',
+      masterNote: 'Turning this off keeps each server’s choice.',
+      masterOff: 'The MCP master switch is off; enabled servers will not connect.',
       searchMcp: 'Search MCP servers…',
       searchSkills: 'Search skills…',
-      emptyMcp: 'No MCP servers found',
-      emptySkills: 'No skills found',
+      emptyMcp: 'No MCP servers yet',
+      emptyMcpHint: 'Use “New MCP” to add one, or copy one from “Import from CC Switch”.',
+      emptySkills: 'No skills yet',
+      emptySkillsHint: 'Place a skill in the Harness skills directory, or import one from CC Switch.',
       emptySearch: 'No matching items',
-      emptyHint: 'Configure MCP servers or install skills in CC Switch, Claude Code, Codex, or Gemini CLI; use Advanced to add another skill directory.',
-      sourceReady: 'Sources ready',
-      sourceMissing: 'No sources found',
-      warnings: 'Notes',
-      advanced: 'Advanced',
-      ccSwitchDir: 'CC Switch directory (compatibility)',
-      ccSwitchDirHint: 'Leave blank for the default ~/.cc-switch',
-      skillDirs: 'Extra skill directories',
-      skillDirsHint: 'One directory per line; used for skills outside CC Switch',
-      saveConfig: 'Save and rescan',
-      saving: 'Saving…',
-      savedConfig: 'Saved; rescanning now.',
-      sourcesTitle: 'Sources',
-      sourceEmpty: 'Not found',
-      itemsCount: 'items',
-      stateFile: 'State file',
-      dbPath: 'Database',
-      agentsPath: 'Shared skills directory',
-      tools: 'tools',
       statusOff: 'Not connected',
       statusConnecting: 'Connecting…',
       statusReady: 'Connected',
       statusError: 'Connection failed',
-      statusUnsupported: 'Unsupported',
-      statusMissing: 'Source removed',
       pending: 'Waiting to connect',
       retry: 'Retry',
-      enabled: 'Enabled',
-      disabled: 'Disabled',
-      readonly: 'Read-only',
-      inRegistry: 'In the skill catalog',
-      notInRegistry: 'Not in the skill catalog yet',
-      source: 'Source',
-      apps: 'Synced to',
+      native: 'Harness',
+      importedFrom: 'From CC Switch',
       envKeys: 'Environment keys',
       headerKeys: 'Header keys',
-      conflict: 'Sources disagree',
+      tools: 'tools',
+      mcpName: 'Name',
+      transport: 'Transport',
+      command: 'Command',
+      args: 'Arguments (one per line)',
+      env: 'Environment (KEY=value, one per line)',
+      cwd: 'Working directory (optional)',
+      url: 'MCP URL',
+      headers: 'Headers (KEY=value, one per line)',
+      timeout: 'Call timeout (ms)',
+      stdio: 'stdio (local process)',
+      http: 'HTTP',
+      secretHint: 'Stored environment/header values are never echoed; a blank value keeps the stored one, and deleting a line removes the key.',
+      enabled: 'Enabled',
+      disabled: 'Disabled',
+      skillEnabled: 'Enabled',
+      skillDisabled: 'Disabled',
+      deleteSkill: 'Delete skill',
+      skillDeleted: 'Skill moved to the trash directory.',
+      mcpDeleted: 'MCP server deleted.',
+      importTitle: 'Import from CC Switch',
+      importSubtitle: 'Reads CC Switch only. Importing copies an independent Harness entry that you can edit, toggle, or delete later.',
+      importMcpTitle: 'MCP servers',
+      importSkillsTitle: 'Skills',
+      importOne: 'Import',
+      importAll: 'Import all',
+      imported: 'Imported',
+      importConflict: 'Name already exists',
+      importUnsupported: 'Not supported by Harness',
+      importInstalled: 'Installed',
+      importEmpty: 'Nothing to import',
+      importHint: 'No CC Switch data found; set the CC Switch directory under Advanced below.',
+      importRefresh: 'Rescan',
+      importNote: 'Imported MCP servers start disabled; enable them on the MCP tab.',
+      ccSwitchDir: 'CC Switch directory (import source)',
+      ccSwitchDirHint: 'Leave blank for ~/.cc-switch. This only affects imports, not Harness-native entries.',
+      dbFound: 'Database found',
+      dbMissing: 'Database missing',
+      skillsFound: 'Skills directory found',
+      skillsMissing: 'Skills directory missing',
+      skillsDir: 'Harness skills directory',
+      disabledDir: 'Disabled skills directory',
+      dbPath: 'CC Switch database',
+      stateFile: 'State file',
+      advanced: 'Advanced / paths',
+      saveConfig: 'Save and rescan',
+      savedConfig: 'Saved.',
+      checkUpdate: 'Check for updates',
+      checkingUpdate: 'Checking…',
+      updateTo: 'Update to',
+      updating: 'Updating…',
+      upToDate: 'Up to date',
+      newVersion: 'New version available',
+      currentVersion: 'Current',
+      releaseNotes: 'Release notes',
+      updateApplied: 'Update applied; refresh the page.',
+      updateRestart: 'Update installed; Harness must be restarted.',
+      updateOverridden: 'Update installed, but a higher-priority entry overrides this one.',
+      updateCancelled: 'Update cancelled.',
+      updateFailed: 'Update failed',
+      updateUnsupported: 'This Host cannot install updates; run the command in a terminal.',
+      warnings: 'Notes',
       loadFailed: 'Could not read status',
       retryLoad: 'Reload',
       actionFailed: 'Action failed',
-      missingRow: 'This item is gone from its source; turn it off to clean up.',
-      configNone: 'default',
-      descriptionEmpty: '(no description)',
-      openAdvanced: 'Sources and paths',
-      mcpCount: 'MCP',
-      skillCount: 'Skills',
+      countMcp: 'MCP',
+      countSkills: 'Skills',
       enabledCount: 'enabled',
-      masterNote: 'Turning this off keeps each item’s choice.',
       noDescription: '(no description)',
-      problem: 'Problem',
-      sourceShadow: 'Loaded directly by Harness',
-      pathLabel: 'Path',
+      deleteTrashNote: 'Deleted skills move to a trash directory instead of being destroyed immediately.',
+      importSuccess: 'Import complete.',
+      importAllErrors: 'Some items were not imported',
+      formError: 'Check the form',
+      toggleSkill: 'Enable/disable skill',
     }
 
     let tr = (key) => ZH[key] ?? key
 
     const CSS = `
       .csh-page { height: 100%; overflow: auto; background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); }
-      .csh-wrap { max-width: 980px; margin: 0 auto; padding: 28px 28px 72px; box-sizing: border-box; }
+      .csh-wrap { max-width: 1000px; margin: 0 auto; padding: 28px 28px 72px; box-sizing: border-box; }
       .csh-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
       .csh-title { margin: 0 0 6px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
-      .csh-sub { margin: 0; max-width: 620px; font-size: 13px; line-height: 1.55; color: var(--dsw-alias-label-secondary); }
+      .csh-sub { margin: 0; max-width: 660px; font-size: 13px; line-height: 1.55; color: var(--dsw-alias-label-secondary); }
       .csh-head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
       .csh-btn { appearance: none; border: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); border-radius: 8px; padding: 7px 13px; font: inherit; font-size: 13px; line-height: 1.35; cursor: pointer; white-space: nowrap; }
       .csh-btn:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); }
@@ -173,14 +256,16 @@ window.__ModuleLoader__.load({
       .csh-btn.primary { background: var(--dsw-alias-button-primary-fill); border-color: transparent; color: var(--dsw-alias-label-primary-foreground); }
       .csh-btn.primary:hover:not(:disabled) { background: var(--dsw-alias-button-primary-hover); }
       .csh-btn.small { padding: 5px 9px; font-size: 12px; }
+      .csh-btn.danger { color: var(--dsw-alias-state-error-primary); }
+      .csh-btn.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 10%, transparent); }
       .csh-card { margin-bottom: 14px; padding: 16px 18px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 12px; background: var(--dsw-alias-bg-layer-1); }
       .csh-toolbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
-      .csh-master { display: flex; align-items: center; gap: 10px; min-width: 168px; }
+      .csh-master { display: flex; align-items: center; gap: 10px; min-width: 178px; }
       .csh-master-name { font-size: 13px; font-weight: 550; }
       .csh-master-note { font-size: 11px; color: var(--dsw-alias-label-secondary); }
       .csh-search { flex: 1 1 220px; min-width: 180px; box-sizing: border-box; padding: 8px 11px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); font: inherit; font-size: 13px; }
       .csh-search:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 0; border-color: transparent; }
-      .csh-tabs { display: flex; gap: 4px; padding: 3px; margin-bottom: 14px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 9px; background: var(--dsw-alias-bg-layer-2); width: fit-content; }
+      .csh-tabs { display: flex; gap: 4px; padding: 3px; margin-bottom: 14px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 9px; background: var(--dsw-alias-bg-layer-2); width: fit-content; flex-wrap: wrap; }
       .csh-tab { appearance: none; border: 0; background: transparent; color: var(--dsw-alias-label-secondary); border-radius: 7px; padding: 6px 14px; font: inherit; font-size: 13px; cursor: pointer; }
       .csh-tab:hover { color: var(--dsw-alias-label-primary); }
       .csh-tab.active { background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font-weight: 550; box-shadow: 0 1px 2px rgb(0 0 0 / 0.08); }
@@ -200,14 +285,14 @@ window.__ModuleLoader__.load({
       .csh-badge.warn { color: var(--dsw-alias-state-warn-primary); border-color: currentColor; }
       .csh-badge.error { color: var(--dsw-alias-state-error-primary); border-color: currentColor; }
       .csh-badge.info { color: var(--dsw-alias-state-business-primary); border-color: currentColor; }
-      .csh-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; min-width: 120px; }
+      .csh-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; min-width: 148px; }
       .csh-status { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--dsw-alias-label-secondary); white-space: nowrap; }
       .csh-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
       .csh-status.ready { color: var(--dsw-alias-state-success-primary); }
       .csh-status.error { color: var(--dsw-alias-state-error-primary); }
       .csh-status.connecting { color: var(--dsw-alias-state-business-primary); }
-      .csh-status.unsupported, .csh-status.missing { color: var(--dsw-alias-state-warn-primary); }
       .csh-error { margin-top: 7px; padding: 7px 9px; border: 1px solid var(--dsw-alias-state-error-primary); border-radius: 7px; font-size: 11px; line-height: 1.5; color: var(--dsw-alias-state-error-primary); word-break: break-word; }
+      .csh-note { margin-top: 6px; font-size: 11px; line-height: 1.5; color: var(--dsw-alias-label-secondary); }
       .csh-switch { position: relative; width: 38px; height: 22px; flex: none; padding: 0; border: 1px solid var(--dsw-alias-border-l2); border-radius: 999px; background: var(--dsw-alias-bg-layer-3); cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease; }
       .csh-switch .csh-knob { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--dsw-alias-label-tertiary); transition: transform 0.15s ease, background 0.15s ease; }
       .csh-switch[aria-checked="true"] { background: var(--dsw-alias-state-business-primary); border-color: var(--dsw-alias-state-business-primary); }
@@ -217,37 +302,46 @@ window.__ModuleLoader__.load({
       .csh-banner { display: flex; gap: 10px; margin-bottom: 14px; padding: 10px 13px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 10px; font-size: 12px; line-height: 1.55; color: var(--dsw-alias-label-secondary); background: var(--dsw-alias-bg-layer-2); }
       .csh-banner.error { color: var(--dsw-alias-state-error-primary); border-color: currentColor; }
       .csh-banner.warn { color: var(--dsw-alias-state-warn-primary); border-color: currentColor; }
+      .csh-banner.update { border-color: var(--dsw-alias-state-business-primary); }
+      .csh-update-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; width: 100%; }
+      .csh-update-line .csh-btn { margin-left: auto; }
+      .csh-link { color: var(--dsw-alias-state-business-primary); font-size: 12px; text-decoration: none; }
+      .csh-link:hover { text-decoration: underline; }
       .csh-warnings { margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.6; color: var(--dsw-alias-label-secondary); }
       .csh-empty { padding: 26px 8px 30px; text-align: center; }
       .csh-empty-title { font-size: 14px; font-weight: 550; }
       .csh-empty-hint { margin-top: 6px; font-size: 12px; line-height: 1.55; color: var(--dsw-alias-label-secondary); }
-      .csh-advanced { margin-top: 16px; }
-      .csh-advanced summary { cursor: pointer; font-size: 13px; color: var(--dsw-alias-label-secondary); user-select: none; }
-      .csh-advanced summary:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; border-radius: 4px; }
-      .csh-source-list { display: flex; flex-direction: column; margin-top: 6px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 8px; overflow: hidden; }
-      .csh-source-row { display: grid; grid-template-columns: 138px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 7px 10px; border-bottom: 1px solid var(--dsw-alias-border-l1); font-size: 11.5px; }
-      .csh-source-row:last-child { border-bottom: 0; }
-      .csh-source-name { font-weight: 500; }
-      .csh-source-path { color: var(--dsw-alias-label-secondary); word-break: break-all; }
-      .csh-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 14px; }
+      .csh-editor { margin-bottom: 14px; padding: 16px 18px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 12px; background: var(--dsw-alias-bg-layer-2); }
+      .csh-editor-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+      .csh-editor-title { margin: 0; font-size: 14px; font-weight: 600; }
+      .csh-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
       .csh-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
       .csh-field.wide { grid-column: 1 / -1; }
       .csh-label { font-size: 12px; color: var(--dsw-alias-label-secondary); }
-      .csh-input { box-sizing: border-box; width: 100%; padding: 8px 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); font: inherit; font-size: 12.5px; }
+      .csh-input { box-sizing: border-box; width: 100%; padding: 8px 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font: inherit; font-size: 12.5px; }
       .csh-input:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 0; border-color: transparent; }
-      .csh-note { font-size: 11px; line-height: 1.45; color: var(--dsw-alias-label-secondary); }
-      .csh-save-row { display: flex; align-items: center; justify-content: flex-end; gap: 10px; grid-column: 1 / -1; }
-      .csh-save-note { margin-right: auto; font-size: 12px; color: var(--dsw-alias-label-secondary); }
+      .csh-textarea { min-height: 72px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.5; }
+      .csh-form-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+      .csh-form-note { margin-right: auto; font-size: 11px; line-height: 1.45; color: var(--dsw-alias-label-secondary); }
+      .csh-check-row { display: flex; align-items: center; gap: 10px; min-height: 34px; }
+      .csh-section { margin-top: 18px; }
+      .csh-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+      .csh-section-title { margin: 0; font-size: 13px; font-weight: 600; }
+      .csh-status-card { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+      .csh-status-path { font-size: 11px; word-break: break-all; color: var(--dsw-alias-label-secondary); }
+      .csh-advanced { margin-top: 16px; }
+      .csh-advanced summary { cursor: pointer; font-size: 13px; color: var(--dsw-alias-label-secondary); user-select: none; }
+      .csh-advanced summary:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; border-radius: 4px; }
+      .csh-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 14px; }
       .csh-footer { margin-top: 16px; font-size: 11px; line-height: 1.5; color: var(--dsw-alias-label-secondary); word-break: break-all; }
-      .csh-row-actions { display: flex; align-items: center; gap: 8px; }
+      .csh-row-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
       @media (max-width: 720px) {
         .csh-wrap { padding: 20px 16px 56px; }
         .csh-head { flex-direction: column; }
         .csh-head-actions { justify-content: flex-start; }
         .csh-row { grid-template-columns: minmax(0, 1fr); }
         .csh-side { flex-direction: row; align-items: center; justify-content: space-between; min-width: 0; }
-        .csh-source-row { grid-template-columns: minmax(0, 1fr) auto; }
-        .csh-source-path { grid-column: 1 / -1; }
+        .csh-side .csh-row-actions { justify-content: flex-end; }
       }
     `
 
@@ -278,28 +372,6 @@ window.__ModuleLoader__.load({
       return payload
     }
 
-    function originLabel(origin) {
-      switch (origin) {
-        case 'cc-switch': return 'CC Switch'
-        case 'claude': return 'Claude Code'
-        case 'codex': return 'Codex'
-        case 'gemini': return 'Gemini CLI'
-        case 'custom': return tr('source')
-        default: return String(origin)
-      }
-    }
-
-    function statusInfo(item) {
-      switch (item.status) {
-        case 'ready': return { className: 'ready', label: `${tr('statusReady')} · ${item.toolCount} ${tr('tools')}` }
-        case 'connecting': return { className: 'connecting', label: tr('statusConnecting') }
-        case 'error': return { className: 'error', label: tr('statusError') }
-        case 'unsupported': return { className: 'unsupported', label: tr('statusUnsupported') }
-        case 'missing': return { className: 'missing', label: tr('statusMissing') }
-        default: return { className: '', label: item.enabled ? tr('pending') : tr('statusOff') }
-      }
-    }
-
     function Badge({ tone, children }) {
       return h('span', { className: `csh-badge${tone ? ` ${tone}` : ''}` }, children)
     }
@@ -317,55 +389,153 @@ window.__ModuleLoader__.load({
       }, h('span', { className: 'csh-knob' }))
     }
 
-    function McpRow({ item, busy, onToggle, onRetry }) {
+    function statusInfo(item) {
+      switch (item.status) {
+        case 'ready': return { className: 'ready', label: `${tr('statusReady')} · ${item.toolCount} ${tr('tools')}` }
+        case 'connecting': return { className: 'connecting', label: tr('statusConnecting') }
+        case 'error': return { className: 'error', label: tr('statusError') }
+        default: return { className: '', label: item.pending ? tr('pending') : tr('statusOff') }
+      }
+    }
+
+    function sourceBadge(source) {
+      if (source?.type === 'ccswitch') return h(Badge, { tone: 'info' }, tr('importedFrom'))
+      return h(Badge, null, tr('native'))
+    }
+
+    function McpEditor({ detail, busy, onSave, onCancel }) {
+      const editing = detail !== undefined
+      const [form, setForm] = React.useState(() => ({
+        name: detail?.name ?? '',
+        transport: detail?.transport ?? 'stdio',
+        command: detail?.command ?? '',
+        argsText: (detail?.args ?? []).join('\n'),
+        envText: (detail?.envKeys ?? []).map((key) => `${key}=`).join('\n'),
+        cwd: detail?.cwd ?? '',
+        url: detail?.url ?? '',
+        headersText: (detail?.headerKeys ?? []).map((key) => `${key}=`).join('\n'),
+        toolCallTimeoutMs: String(detail?.toolCallTimeoutMs ?? 60000),
+        enabled: detail?.enabled ?? true,
+      }))
+      const set = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }))
+      const submit = () => {
+        onSave({
+          id: detail?.id,
+          name: form.name,
+          transport: form.transport,
+          command: form.command,
+          argsText: form.argsText,
+          envText: form.envText,
+          cwd: form.cwd,
+          url: form.url,
+          headersText: form.headersText,
+          toolCallTimeoutMs: Number(form.toolCallTimeoutMs),
+          enabled: form.enabled,
+        })
+      }
+      return h('div', { className: 'csh-editor' },
+        h('div', { className: 'csh-editor-head' },
+          h('h2', { className: 'csh-editor-title' }, editing ? `${tr('edit')} · ${detail.name}` : tr('addMcp')),
+          h('div', { className: 'csh-row-actions' },
+            h('button', { type: 'button', className: 'csh-btn small', disabled: busy, onClick: onCancel }, tr('cancel')),
+            h('button', { type: 'button', className: 'csh-btn primary small', disabled: busy, onClick: submit }, busy ? tr('saving') : tr('save')),
+          ),
+        ),
+        h('div', { className: 'csh-form-grid' },
+          h('div', { className: 'csh-field' },
+            h('label', { className: 'csh-label' }, tr('mcpName')),
+            h('input', { className: 'csh-input', value: form.name, onChange: set('name'), placeholder: 'github' }),
+          ),
+          h('div', { className: 'csh-field' },
+            h('label', { className: 'csh-label' }, tr('transport')),
+            h('select', { className: 'csh-input', value: form.transport, onChange: set('transport') },
+              h('option', { value: 'stdio' }, tr('stdio')),
+              h('option', { value: 'http' }, tr('http')),
+            ),
+          ),
+          h('div', { className: 'csh-field' },
+            h('label', { className: 'csh-label' }, tr('timeout')),
+            h('input', { className: 'csh-input', type: 'number', min: 1000, max: 600000, step: 1000, value: form.toolCallTimeoutMs, onChange: set('toolCallTimeoutMs') }),
+          ),
+          h('div', { className: 'csh-field' },
+            h('label', { className: 'csh-label' }, tr('enabled')),
+            h('div', { className: 'csh-check-row' },
+              h(Switch, {
+                checked: form.enabled,
+                busy,
+                title: form.enabled ? tr('enabled') : tr('disabled'),
+                onChange: (next) => setForm((current) => ({ ...current, enabled: next })),
+              }),
+              h('span', { className: 'csh-note', style: { marginTop: 0 } }, form.enabled ? tr('enabled') : tr('disabled')),
+            ),
+          ),
+          form.transport === 'stdio'
+            ? h(React.Fragment, null,
+                h('div', { className: 'csh-field' },
+                  h('label', { className: 'csh-label' }, tr('command')),
+                  h('input', { className: 'csh-input', value: form.command, onChange: set('command'), placeholder: 'npx' }),
+                ),
+                h('div', { className: 'csh-field' },
+                  h('label', { className: 'csh-label' }, tr('cwd')),
+                  h('input', { className: 'csh-input', value: form.cwd, onChange: set('cwd'), placeholder: '/path/to/project' }),
+                ),
+                h('div', { className: 'csh-field wide' },
+                  h('label', { className: 'csh-label' }, tr('args')),
+                  h('textarea', { className: 'csh-input csh-textarea', value: form.argsText, onChange: set('argsText'), placeholder: '-y\n@modelcontextprotocol/server-github' }),
+                ),
+                h('div', { className: 'csh-field wide' },
+                  h('label', { className: 'csh-label' }, tr('env')),
+                  h('textarea', { className: 'csh-input csh-textarea', value: form.envText, onChange: set('envText'), placeholder: 'GITHUB_TOKEN=' }),
+                  h('div', { className: 'csh-note' }, tr('secretHint')),
+                ),
+              )
+            : h(React.Fragment, null,
+                h('div', { className: 'csh-field wide' },
+                  h('label', { className: 'csh-label' }, tr('url')),
+                  h('input', { className: 'csh-input', value: form.url, onChange: set('url'), placeholder: 'https://example.com/mcp' }),
+                ),
+                h('div', { className: 'csh-field wide' },
+                  h('label', { className: 'csh-label' }, tr('headers')),
+                  h('textarea', { className: 'csh-input csh-textarea', value: form.headersText, onChange: set('headersText'), placeholder: 'Authorization=Bearer ...' }),
+                  h('div', { className: 'csh-note' }, tr('secretHint')),
+                ),
+              ),
+        ),
+      )
+    }
+
+    function McpRow({ item, busy, confirmDelete, onToggle, onEdit, onDelete, onRetry, onConfirmDelete }) {
       const info = statusInfo(item)
-      const blocked = item.unsupported !== undefined && item.enabled !== true
-      return h('div', {
-        className: `csh-row${item.enabled && item.master !== false ? '' : ' is-off'}`,
-      },
+      return h('div', { className: `csh-row${item.enabled && item.master ? '' : ' is-off'}` },
         h('div', { className: 'csh-main' },
           h('div', { className: 'csh-name-line' },
             h('span', { className: 'csh-name' }, item.name),
-            ...(item.origins ?? []).map((origin) => h(Badge, { key: origin, tone: origin === 'cc-switch' ? 'info' : undefined }, originLabel(origin))),
-            item.conflict ? h(Badge, { tone: 'warn' }, tr('conflict')) : null,
-            item.apps && item.apps.length > 0
-              ? h(Badge, { tone: undefined }, `${tr('apps')}: ${item.apps.join(', ')}`)
-              : null,
+            sourceBadge(item.source),
+            h(Badge, null, item.transport),
+            item.envKeys.length > 0 ? h(Badge, null, `${tr('envKeys')}: ${item.envKeys.join(', ')}`) : null,
+            item.headerKeys.length > 0 ? h(Badge, null, `${tr('headerKeys')}: ${item.headerKeys.join(', ')}`) : null,
           ),
-          h('div', { className: 'csh-desc' }, item.description || item.summary || tr('noDescription')),
-          h('div', { className: 'csh-meta' },
-            h('span', { className: 'csh-code' }, item.summary),
-            item.serverName ? h('span', { className: 'csh-code' }, `mcp__${item.serverName}__`) : null,
-            item.envKeys && item.envKeys.length > 0
-              ? h('span', null, `${tr('envKeys')}: ${item.envKeys.join(', ')}`)
-              : null,
-            item.headerKeys && item.headerKeys.length > 0
-              ? h('span', null, `${tr('headerKeys')}: ${item.headerKeys.join(', ')}`)
-              : null,
-          ),
+          h('div', { className: 'csh-desc' }, item.summary),
+          h('div', { className: 'csh-meta' }, h('span', { className: 'csh-code' }, `mcp__${item.serverName}__`)),
           item.error && item.status === 'error' ? h('div', { className: 'csh-error' }, item.error) : null,
-          item.unsupported && item.status !== 'missing' ? h('div', { className: 'csh-note', style: { marginTop: 6 } }, item.unsupported) : null,
-          item.status === 'missing' ? h('div', { className: 'csh-error' }, tr('missingRow')) : null,
         ),
         h('div', { className: 'csh-side' },
-          h('span', { className: `csh-status ${info.className}` },
-            h('span', { className: 'csh-dot' }),
-            info.label,
-          ),
+          h('span', { className: `csh-status ${info.className}` }, h('span', { className: 'csh-dot' }), info.label),
           h('div', { className: 'csh-row-actions' },
             item.status === 'error' && item.enabled && item.master
-              ? h('button', {
-                  type: 'button',
-                  className: 'csh-btn small',
-                  disabled: busy,
-                  onClick: () => onRetry(item),
-                }, tr('retry'))
+              ? h('button', { type: 'button', className: 'csh-btn small', disabled: busy, onClick: () => onRetry(item) }, tr('retry'))
               : null,
+            h('button', { type: 'button', className: 'csh-btn small', disabled: busy, onClick: () => onEdit(item) }, tr('edit')),
+            h('button', {
+              type: 'button',
+              className: 'csh-btn small danger',
+              disabled: busy,
+              onClick: () => (confirmDelete ? onDelete(item) : onConfirmDelete(item)),
+            }, confirmDelete ? tr('confirmDelete') : tr('delete')),
             h(Switch, {
               checked: item.enabled,
-              disabled: blocked,
               busy,
-              title: blocked ? (item.unsupported || tr('statusMissing')) : (item.enabled ? tr('enabled') : tr('disabled')),
+              title: item.enabled ? tr('enabled') : tr('disabled'),
               onChange: (next) => onToggle(item, next),
             }),
           ),
@@ -373,33 +543,29 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function SkillRow({ item, busy, onToggle }) {
-      const blocked = item.controllable !== true && item.missing !== true && item.enabled !== true
-      return h('div', { className: `csh-row${item.enabled && item.master !== false ? '' : ' is-off'}` },
+    function SkillRow({ item, busy, confirmDelete, onToggle, onDelete, onConfirmDelete }) {
+      return h('div', { className: `csh-row${item.enabled ? '' : ' is-off'}` },
         h('div', { className: 'csh-main' },
           h('div', { className: 'csh-name-line' },
             h('span', { className: 'csh-name' }, item.name),
-            item.source ? h(Badge, { tone: item.source === 'cc-switch' ? 'info' : undefined }, originLabel(item.source)) : null,
-            blocked ? h(Badge, { tone: 'warn' }, tr('readonly')) : null,
-            item.enabled && item.master !== false && !item.missing
-              ? h(Badge, { tone: item.inRegistry ? 'ok' : 'warn' }, item.inRegistry ? tr('inRegistry') : tr('notInRegistry'))
-              : null,
+            h(Badge, { tone: item.enabled ? 'ok' : undefined }, item.enabled ? tr('skillEnabled') : tr('skillDisabled')),
+            h(Badge, null, item.kind === 'directory' ? 'SKILL.md' : '.md'),
           ),
           h('div', { className: 'csh-desc' }, item.description || tr('noDescription')),
-          h('div', { className: 'csh-meta' },
-            item.rootLabel ? h('span', null, `${tr('source')}: ${item.rootLabel}`) : null,
-            item.path ? h('span', { className: 'csh-code' }, item.path) : null,
-          ),
-          item.missing ? h('div', { className: 'csh-error' }, tr('missingRow')) : null,
-          (blocked || item.missing) && item.readonlyReason ? h('div', { className: 'csh-error' }, item.readonlyReason) : null,
+          h('div', { className: 'csh-meta' }, h('span', { className: 'csh-code' }, item.path)),
         ),
         h('div', { className: 'csh-side' },
           h('div', { className: 'csh-row-actions' },
+            h('button', {
+              type: 'button',
+              className: 'csh-btn small danger',
+              disabled: busy,
+              onClick: () => (confirmDelete ? onDelete(item) : onConfirmDelete(item)),
+            }, confirmDelete ? tr('confirmDelete') : tr('delete')),
             h(Switch, {
               checked: item.enabled,
-              disabled: blocked,
               busy,
-              title: blocked ? (item.readonlyReason || tr('readonly')) : (item.enabled ? tr('enabled') : tr('disabled')),
+              title: tr('toggleSkill'),
               onChange: (next) => onToggle(item, next),
             }),
           ),
@@ -407,12 +573,10 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function EmptyState({ searching, tab }) {
-      if (searching) return h('div', { className: 'csh-empty' }, h('div', { className: 'csh-empty-title' }, tr('emptySearch')))
-      const title = tab === 'mcp' ? tr('emptyMcp') : tr('emptySkills')
+    function EmptyState({ searching, title, hint }) {
       return h('div', { className: 'csh-empty' },
-        h('div', { className: 'csh-empty-title' }, title),
-        h('div', { className: 'csh-empty-hint' }, tr('emptyHint')),
+        h('div', { className: 'csh-empty-title' }, searching ? tr('emptySearch') : title),
+        searching ? null : h('div', { className: 'csh-empty-hint' }, hint),
       )
     }
 
@@ -432,42 +596,65 @@ window.__ModuleLoader__.load({
       )
     }
 
+    function reasonText(value) {
+      if (value === undefined || value === null || value === '') return ''
+      if (typeof value === 'string') return value
+      try { return JSON.stringify(value) } catch { return String(value) }
+    }
+
     function Page() {
       const [snapshot, setSnapshot] = React.useState(null)
       const [loadError, setLoadError] = React.useState('')
       const [actionError, setActionError] = React.useState('')
+      const [notice, setNotice] = React.useState('')
       const [loading, setLoading] = React.useState(true)
       const [busy, setBusy] = React.useState('')
       const [tab, setTab] = React.useState('mcp')
       const [query, setQuery] = React.useState('')
+      const [editor, setEditor] = React.useState(null)
+      const [confirmMcp, setConfirmMcp] = React.useState('')
+      const [confirmSkill, setConfirmSkill] = React.useState('')
+      const [importPayload, setImportPayload] = React.useState(null)
+      const [importLoading, setImportLoading] = React.useState(false)
+      const [importError, setImportError] = React.useState('')
       const [ccSwitchDir, setCcSwitchDir] = React.useState('')
-      const [skillDirs, setSkillDirs] = React.useState('')
+      const [configNote, setConfigNote] = React.useState('')
+      const [updateInfo, setUpdateInfo] = React.useState(null)
+      const [updateChecking, setUpdateChecking] = React.useState(false)
+      const [updateBusy, setUpdateBusy] = React.useState(false)
+      const [updateError, setUpdateError] = React.useState('')
+      const [updateNote, setUpdateNote] = React.useState('')
+      const snapshotRef = React.useRef(null)
       const configInit = React.useRef(false)
-      const [saving, setSaving] = React.useState(false)
-      const [saveNote, setSaveNote] = React.useState('')
       const refreshTimer = React.useRef(null)
+      const updateTimer = React.useRef(null)
 
-      React.useEffect(() => () => clearTimeout(refreshTimer.current), [])
+      React.useEffect(() => () => {
+        clearTimeout(refreshTimer.current)
+        clearTimeout(updateTimer.current)
+      }, [])
 
       const scheduleRefresh = () => {
         clearTimeout(refreshTimer.current)
-        refreshTimer.current = setTimeout(() => {
-          void load(false)
-        }, 2200)
+        refreshTimer.current = setTimeout(() => { void load() }, 2200)
       }
 
-      const load = React.useCallback(async (force) => {
-        if (!force) setLoading(true)
+      const applySnapshot = (payload) => {
+        snapshotRef.current = payload
+        setSnapshot(payload)
+        if (!configInit.current) {
+          setCcSwitchDir(payload.config?.ccSwitchDir ?? '')
+          configInit.current = true
+        }
+      }
+
+      const load = React.useCallback(async () => {
+        if (snapshotRef.current === null) setLoading(true)
         try {
-          const payload = await requestJson(`${STATE_ROUTE}${force ? '?refresh=1' : ''}`)
-          setSnapshot(payload)
+          const payload = await requestJson(`${API}/state`)
+          applySnapshot(payload)
           setLoadError('')
-          if (!configInit.current) {
-            setCcSwitchDir(payload.config?.ccSwitchDir ?? '')
-            setSkillDirs((payload.config?.skillDirs ?? []).join('\n'))
-            configInit.current = true
-          }
-          if (payload.mcp?.items?.some((item) => item.status === 'connecting' || item.pending)) scheduleRefresh()
+          if (payload.mcp.items.some((item) => item.status === 'connecting' || item.pending)) scheduleRefresh()
         } catch (error) {
           setLoadError(errorText(error))
         } finally {
@@ -475,88 +662,178 @@ window.__ModuleLoader__.load({
         }
       }, [])
 
-      React.useEffect(() => {
-        void load(false)
-      }, [load])
+      React.useEffect(() => { void load() }, [load])
 
-      const act = async (body, key) => {
+      const loadUpdate = async (force, manual) => {
+        setUpdateChecking(true)
+        if (manual) {
+          setUpdateError('')
+          setUpdateNote('')
+        }
+        try {
+          const payload = await requestJson(`${API}/update${force ? '?refresh=1' : ''}`)
+          setUpdateInfo(payload)
+          if (manual && payload.ok !== true) setUpdateError(payload.error ?? tr('updateFailed'))
+          if (manual && payload.ok === true && payload.updateAvailable !== true) setUpdateNote(`${tr('upToDate')} · v${payload.current}`)
+        } catch (error) {
+          if (manual) setUpdateError(errorText(error))
+        } finally {
+          setUpdateChecking(false)
+        }
+      }
+
+      React.useEffect(() => { void loadUpdate(false, false) }, [])
+
+      const runUpdate = async () => {
+        setUpdateBusy(true)
+        setUpdateError('')
+        setUpdateNote('')
+        try {
+          const payload = await requestJson(`${API}/update`, { method: 'POST', body: '{}' })
+          if (payload.ok !== true) throw new Error(payload.result?.error ?? payload.error ?? tr('updateFailed'))
+          const application = payload.result?.application
+          const installed = payload.result?.version
+          if (application === 'restart-required') {
+            setUpdateNote(`${tr('updateRestart')}${payload.result?.restartReason ? ` ${reasonText(payload.result.restartReason)}` : ''}`)
+          } else if (application === 'overridden') {
+            setUpdateNote(tr('updateOverridden'))
+          } else if (application === 'cancelled') {
+            throw new Error(tr('updateCancelled'))
+          } else {
+            setUpdateNote(`${tr('updateApplied')}${installed ? ` (v${installed})` : ''}`)
+          }
+          setUpdateInfo((current) => current === null ? current : {
+            ...current,
+            updateAvailable: false,
+            current: installed ?? current.current,
+            latest: installed ?? current.latest,
+          })
+          if (application === 'applied') {
+            clearTimeout(updateTimer.current)
+            updateTimer.current = setTimeout(() => { void load() }, 1200)
+          }
+        } catch (error) {
+          setUpdateError(errorText(error))
+        } finally {
+          setUpdateBusy(false)
+        }
+      }
+
+      const loadImport = async () => {
+        setImportLoading(true)
+        setImportError('')
+        try {
+          setImportPayload(await requestJson(`${API}/ccswitch`))
+        } catch (error) {
+          setImportError(errorText(error))
+        } finally {
+          setImportLoading(false)
+        }
+      }
+
+      const act = async (url, body, key) => {
         setBusy(key)
         setActionError('')
+        setNotice('')
         try {
-          const payload = await requestJson(ACTION_ROUTE, {
-            method: 'POST',
-            body: JSON.stringify(body),
-          })
-          setSnapshot(payload)
+          const payload = await requestJson(url, { method: 'POST', body: JSON.stringify(body) })
+          applySnapshot(payload)
           if (payload.mcp?.items?.some((item) => item.status === 'connecting' || item.pending)) scheduleRefresh()
+          return payload
         } catch (error) {
           setActionError(errorText(error))
-          void load(false)
+          return null
         } finally {
           setBusy('')
         }
       }
 
-      const saveConfig = async () => {
-        setSaving(true)
-        setSaveNote('')
+      const switchTab = (next) => {
+        setTab(next)
+        setQuery('')
+        setEditor(null)
+        setConfirmMcp('')
+        setConfirmSkill('')
+        if (next === 'import' && importPayload === null && !importLoading) void loadImport()
+      }
+
+      const openNew = () => { setEditor({ mode: 'new', detail: undefined }); setActionError('') }
+      const openEdit = async (item) => {
+        setBusy(`detail:${item.id}`)
         setActionError('')
         try {
-          const dirs = skillDirs.split(/[\n,]+/).map((entry) => entry.trim()).filter((entry) => entry !== '')
-          const payload = await requestJson(CONFIG_ROUTE, {
-            method: 'POST',
-            body: JSON.stringify({ ccSwitchDir: ccSwitchDir.trim(), skillDirs: dirs }),
-          })
-          setSnapshot(payload)
-          setSaveNote(tr('savedConfig'))
+          const payload = await requestJson(`${API}/mcp-detail?id=${encodeURIComponent(item.id)}`)
+          setEditor({ mode: 'edit', detail: payload.item })
         } catch (error) {
           setActionError(errorText(error))
         } finally {
-          setSaving(false)
+          setBusy('')
+        }
+      }
+      const saveMcp = async (form) => {
+        const payload = await act(`${API}/mcp-save`, form, 'editor')
+        if (payload !== null) setEditor(null)
+      }
+      const toggleMcp = (item, enabled) => { void act(`${API}/mcp-toggle`, { id: item.id, enabled }, `mcp:${item.id}`) }
+      const deleteMcp = async (item) => {
+        const payload = await act(`${API}/mcp-delete`, { id: item.id }, `mcp:${item.id}`)
+        if (payload !== null) { setConfirmMcp(''); setNotice(tr('mcpDeleted')) }
+      }
+      const retryMcp = (item) => { void act(`${API}/mcp-retry`, { id: item.id }, `mcp:${item.id}`) }
+      const toggleSkill = (item, enabled) => { void act(`${API}/skills-toggle`, { name: item.name, enabled }, `skill:${item.name}`) }
+      const deleteSkill = async (item) => {
+        const payload = await act(`${API}/skills-delete`, { name: item.name }, `skill:${item.name}`)
+        if (payload !== null) { setConfirmSkill(''); setNotice(tr('skillDeleted')) }
+      }
+
+      const importOne = async (kind, value) => {
+        const payload = kind === 'mcp'
+          ? await act(`${API}/import-mcp`, { id: value }, `import:${value}`)
+          : await act(`${API}/import-skill`, { name: value }, `import:${value}`)
+        if (payload !== null) {
+          setNotice(tr('importSuccess'))
+          await loadImport()
+        }
+      }
+      const importAll = async (kind) => {
+        const payload = await act(`${API}/import-all`, { kind }, `import-all:${kind}`)
+        if (payload !== null) {
+          setNotice(`${tr('importSuccess')}${payload.imported ? ` (${payload.imported})` : ''}`)
+          if (payload.errors?.length) setActionError(`${tr('importAllErrors')}: ${payload.errors.join('; ')}`)
+          await loadImport()
         }
       }
 
-      const toggleMaster = (kind) => {
-        const current = kind === 'mcp' ? snapshot?.mcp?.master !== false : snapshot?.skills?.master !== false
-        void act({ type: kind, master: true, enabled: !current }, `master:${kind}`)
+      const saveConfig = async () => {
+        const payload = await act(`${API}/config`, { ccSwitchDir: ccSwitchDir.trim() }, 'config')
+        if (payload !== null) {
+          setConfigNote(tr('savedConfig'))
+          await loadImport()
+        }
       }
 
       if (loading && snapshot === null) {
-        return h('div', { className: 'csh-page' },
-          h('style', { 'data-plugin': NS }, CSS),
-          h('div', { className: 'csh-wrap' },
-            h('div', { className: 'csh-banner' }, tr('refreshing')),
-          ),
-        )
+        return h('div', { className: 'csh-page' }, h('style', { 'data-plugin': NS }, CSS),
+          h('div', { className: 'csh-wrap' }, h('div', { className: 'csh-banner' }, tr('refreshing'))))
       }
-
       if (snapshot === null) {
-        return h('div', { className: 'csh-page' },
-          h('style', { 'data-plugin': NS }, CSS),
+        return h('div', { className: 'csh-page' }, h('style', { 'data-plugin': NS }, CSS),
           h('div', { className: 'csh-wrap' },
             h('div', { className: 'csh-banner error' }, `${tr('loadFailed')}: ${loadError}`),
-            h('button', { type: 'button', className: 'csh-btn', onClick: () => void load(true) }, tr('retryLoad')),
-          ),
-        )
+            h('button', { type: 'button', className: 'csh-btn', onClick: () => void load() }, tr('retryLoad')),
+          ))
       }
 
-      const items = tab === 'mcp' ? snapshot.mcp.items : snapshot.skills.items
+      const mcpItems = snapshot.mcp.items
+      const skillItems = snapshot.skills.items
       const needle = query.trim().toLowerCase()
-      const filtered = needle === ''
-        ? items
-        : items.filter((item) => {
-            const haystack = tab === 'mcp'
-              ? `${item.name} ${item.description ?? ''} ${item.summary ?? ''} ${(item.origins ?? []).join(' ')}`
-              : `${item.name} ${item.description ?? ''} ${item.path ?? ''}`
-            return haystack.toLowerCase().includes(needle)
-          })
-      const anySource = (snapshot.sources ?? []).some((source) => source.exists)
-      const enabledMcp = snapshot.mcp.items.filter((item) => item.enabled).length
-      const enabledSkills = snapshot.skills.items.filter((item) => item.enabled).length
+      const filteredMcp = needle === '' ? mcpItems : mcpItems.filter((item) => `${item.name} ${item.summary}`.toLowerCase().includes(needle))
+      const filteredSkills = needle === '' ? skillItems : skillItems.filter((item) => `${item.name} ${item.description}`.toLowerCase().includes(needle))
+      const enabledMcp = mcpItems.filter((item) => item.enabled).length
+      const enabledSkills = skillItems.filter((item) => item.enabled).length
       const warnings = snapshot.warnings ?? []
 
-      return h('div', { className: 'csh-page' },
-        h('style', { 'data-plugin': NS }, CSS),
+      return h('div', { className: 'csh-page' }, h('style', { 'data-plugin': NS }, CSS),
         h('div', { className: 'csh-wrap' },
           h('div', { className: 'csh-head' },
             h('div', null,
@@ -564,153 +841,232 @@ window.__ModuleLoader__.load({
               h('p', { className: 'csh-sub' }, tr('subtitle')),
             ),
             h('div', { className: 'csh-head-actions' },
-              h(Badge, { tone: anySource ? 'ok' : 'warn' }, anySource ? tr('sourceReady') : tr('sourceMissing')),
-              h('button', {
-                type: 'button',
-                className: 'csh-btn',
-                disabled: busy === 'rescan',
-                onClick: () => void act({ type: 'rescan' }, 'rescan'),
-              }, busy === 'rescan' ? tr('refreshing') : tr('refresh')),
+              h(Badge, { tone: 'ok' }, `${tr('countMcp')} ${mcpItems.length} · ${tr('countSkills')} ${skillItems.length}`),
+              updateInfo?.updateAvailable
+                ? h('button', {
+                    type: 'button',
+                    className: 'csh-btn primary',
+                    disabled: updateBusy || updateInfo.installable === false,
+                    onClick: () => void runUpdate(),
+                  }, updateBusy ? tr('updating') : `${tr('updateTo')} v${updateInfo.latest}`)
+                : h('button', {
+                    type: 'button',
+                    className: 'csh-btn',
+                    disabled: updateChecking,
+                    onClick: () => void loadUpdate(true, true),
+                  }, updateChecking ? tr('checkingUpdate') : (updateInfo?.ok === true ? `${tr('upToDate')} · v${updateInfo.current}` : tr('checkUpdate'))),
+              h('button', { type: 'button', className: 'csh-btn', onClick: () => { void load(); if (tab === 'import') void loadImport() } }, tr('refresh')),
             ),
           ),
 
-          warnings.length > 0
-            ? h('div', { className: 'csh-card' },
-                h('div', { className: 'csh-master-note', style: { marginBottom: 6 } }, tr('warnings')),
-                h('ul', { className: 'csh-warnings' }, warnings.map((warning, index) => h('li', { key: index }, warning))),
-              )
-            : null,
+          warnings.length > 0 ? h('div', { className: 'csh-card' },
+            h('div', { className: 'csh-master-note', style: { marginBottom: 6 } }, tr('warnings')),
+            h('ul', { className: 'csh-warnings' }, warnings.map((warning, index) => h('li', { key: index }, warning))),
+          ) : null,
+
+          updateInfo?.updateAvailable ? h('div', { className: 'csh-banner update' },
+            h('div', { className: 'csh-update-line' },
+              h('strong', null, `${tr('newVersion')} v${updateInfo.latest}`),
+              h('span', { className: 'csh-note', style: { marginTop: 0 } }, `${tr('currentVersion')} v${updateInfo.current}`),
+              updateInfo.release?.url ? h('a', {
+                className: 'csh-link',
+                href: updateInfo.release.url,
+                target: '_blank',
+                rel: 'noreferrer',
+              }, tr('releaseNotes')) : null,
+              updateInfo.installable === false
+                ? h('span', { className: 'csh-note', style: { marginTop: 0 } }, tr('updateUnsupported'))
+                : h('button', {
+                    type: 'button',
+                    className: 'csh-btn primary small',
+                    disabled: updateBusy,
+                    onClick: () => void runUpdate(),
+                  }, updateBusy ? tr('updating') : `${tr('updateTo')} v${updateInfo.latest}`),
+            ),
+          ) : null,
+          updateError !== '' ? h('div', { className: 'csh-banner error' }, `${tr('updateFailed')}: ${updateError}`) : null,
+          updateNote !== '' ? h('div', { className: 'csh-banner' }, updateNote) : null,
 
           actionError !== '' ? h('div', { className: 'csh-banner error' }, `${tr('actionFailed')}: ${actionError}`) : null,
-          loadError !== '' && snapshot !== null ? h('div', { className: 'csh-banner warn' }, `${tr('loadFailed')}: ${loadError}`) : null,
+          notice !== '' ? h('div', { className: 'csh-banner' }, notice) : null,
+          loadError !== '' ? h('div', { className: 'csh-banner warn' }, `${tr('loadFailed')}: ${loadError}`) : null,
 
-          h('div', { className: 'csh-card' },
-            h('div', { className: 'csh-tabs', role: 'tablist' },
-              h('button', {
-                type: 'button',
-                role: 'tab',
-                'aria-selected': tab === 'mcp',
-                className: `csh-tab${tab === 'mcp' ? ' active' : ''}`,
-                onClick: () => setTab('mcp'),
-              }, `${tr('tabMcp')} · ${snapshot.mcp.items.length}`),
-              h('button', {
-                type: 'button',
-                role: 'tab',
-                'aria-selected': tab === 'skills',
-                className: `csh-tab${tab === 'skills' ? ' active' : ''}`,
-                onClick: () => setTab('skills'),
-              }, `${tr('tabSkills')} · ${snapshot.skills.items.length}`),
-            ),
+          h('div', { className: 'csh-tabs', role: 'tablist' },
+            h('button', { type: 'button', role: 'tab', 'aria-selected': tab === 'mcp', className: `csh-tab${tab === 'mcp' ? ' active' : ''}`, onClick: () => switchTab('mcp') }, `${tr('tabMcp')} · ${mcpItems.length}`),
+            h('button', { type: 'button', role: 'tab', 'aria-selected': tab === 'skills', className: `csh-tab${tab === 'skills' ? ' active' : ''}`, onClick: () => switchTab('skills') }, `${tr('tabSkills')} · ${skillItems.length}`),
+            h('button', { type: 'button', role: 'tab', 'aria-selected': tab === 'import', className: `csh-tab${tab === 'import' ? ' active' : ''}`, onClick: () => switchTab('import') }, tr('tabImport')),
+          ),
 
+          tab === 'mcp' ? h('div', { className: 'csh-card' },
             h('div', { className: 'csh-toolbar' },
               h('div', { className: 'csh-master' },
                 h(Switch, {
-                  checked: tab === 'mcp' ? snapshot.mcp.master : snapshot.skills.master,
-                  busy: busy === `master:${tab === 'mcp' ? 'mcp' : 'skills'}`,
-                  title: tab === 'mcp' ? tr('masterMcp') : tr('masterSkills'),
-                  onChange: () => toggleMaster(tab === 'mcp' ? 'mcp' : 'skills'),
+                  checked: snapshot.mcp.master,
+                  busy: busy === 'master',
+                  title: tr('masterMcp'),
+                  onChange: (enabled) => void act(`${API}/mcp-master`, { enabled }, 'master'),
                 }),
                 h('div', null,
-                  h('div', { className: 'csh-master-name' }, tab === 'mcp' ? tr('masterMcp') : tr('masterSkills')),
+                  h('div', { className: 'csh-master-name' }, tr('masterMcp')),
                   h('div', { className: 'csh-master-note' }, tr('masterNote')),
                 ),
               ),
-              h('input', {
-                className: 'csh-search',
-                type: 'search',
-                value: query,
-                placeholder: tab === 'mcp' ? tr('searchMcp') : tr('searchSkills'),
-                'aria-label': tab === 'mcp' ? tr('searchMcp') : tr('searchSkills'),
-                onChange: (event) => setQuery(event.target.value),
-              }),
-              h('span', { className: 'csh-master-note' },
-                `${tab === 'mcp' ? tr('mcpCount') : tr('skillCount')} · ${tab === 'mcp' ? enabledMcp : enabledSkills} ${tr('enabledCount')}`,
-              ),
+              h('button', { type: 'button', className: 'csh-btn primary', onClick: openNew }, tr('addMcp')),
+              h('input', { className: 'csh-search', type: 'search', value: query, placeholder: tr('searchMcp'), 'aria-label': tr('searchMcp'), onChange: (event) => setQuery(event.target.value) }),
+              h('span', { className: 'csh-master-note' }, `${enabledMcp} ${tr('enabledCount')}`),
             ),
-
-            tab === 'mcp' && !snapshot.mcp.master
-              ? h('div', { className: 'csh-banner warn', style: { marginBottom: 10 } }, tr('masterOff'))
-              : null,
-            tab === 'skills' && !snapshot.skills.master
-              ? h('div', { className: 'csh-banner warn', style: { marginBottom: 10 } }, tr('masterOff'))
-              : null,
-
+            !snapshot.mcp.master ? h('div', { className: 'csh-banner warn' }, tr('masterOff')) : null,
+            editor !== null ? h(McpEditor, {
+              key: editor.mode === 'edit' ? `edit:${editor.detail?.id}` : 'new',
+              detail: editor.detail,
+              busy: busy === 'editor',
+              onSave: (form) => void saveMcp(form),
+              onCancel: () => setEditor(null),
+            }) : null,
             h('div', { className: 'csh-list' },
-              filtered.length === 0
-                ? h(EmptyState, { searching: needle !== '', tab })
-                : filtered.map((item) => tab === 'mcp'
-                    ? h(McpRow, {
-                        key: item.key,
-                        item,
-                        busy: busy === `mcp:${item.key}`,
-                        onToggle: (row, next) => void act({ type: 'mcp', key: row.key, enabled: next }, `mcp:${row.key}`),
-                        onRetry: (row) => void act({ type: 'retry', key: row.key }, `mcp:${row.key}`),
-                      })
-                    : h(SkillRow, {
-                        key: item.name,
-                        item,
-                        busy: busy === `skills:${item.name}`,
-                        onToggle: (row, next) => void act({ type: 'skills', key: row.name, enabled: next }, `skills:${row.name}`),
-                      }),
+              filteredMcp.length === 0
+                ? h(EmptyState, { searching: needle !== '', title: tr('emptyMcp'), hint: tr('emptyMcpHint') })
+                : filteredMcp.map((item) => h(McpRow, {
+                    key: item.id,
+                    item,
+                    busy: busy === `mcp:${item.id}` || busy === `detail:${item.id}`,
+                    confirmDelete: confirmMcp === item.id,
+                    onToggle: toggleMcp,
+                    onEdit: (row) => void openEdit(row),
+                    onDelete: (row) => void deleteMcp(row),
+                    onRetry: retryMcp,
+                    onConfirmDelete: (row) => setConfirmMcp(row.id),
+                  })),
             ),
-          ),
-        ),
+          ) : null,
+
+          tab === 'skills' ? h('div', { className: 'csh-card' },
+            h('div', { className: 'csh-toolbar' },
+              h('input', { className: 'csh-search', type: 'search', value: query, placeholder: tr('searchSkills'), 'aria-label': tr('searchSkills'), onChange: (event) => setQuery(event.target.value) }),
+              h('span', { className: 'csh-master-note' }, `${enabledSkills} ${tr('enabledCount')}`),
+              h('button', { type: 'button', className: 'csh-btn', onClick: () => switchTab('import') }, tr('tabImport')),
+            ),
+            h('div', { className: 'csh-list' },
+              filteredSkills.length === 0
+                ? h(EmptyState, { searching: needle !== '', title: tr('emptySkills'), hint: tr('emptySkillsHint') })
+                : filteredSkills.map((item) => h(SkillRow, {
+                    key: item.name,
+                    item,
+                    busy: busy === `skill:${item.name}`,
+                    confirmDelete: confirmSkill === item.name,
+                    onToggle: toggleSkill,
+                    onDelete: (row) => void deleteSkill(row),
+                    onConfirmDelete: (row) => setConfirmSkill(row.name),
+                  })),
+            ),
+            h('div', { className: 'csh-note' }, tr('deleteTrashNote')),
+          ) : null,
+
+          tab === 'import' ? h('div', null,
+            h('div', { className: 'csh-card' },
+              h('div', { className: 'csh-section-head' },
+                h('div', null,
+                  h('h2', { className: 'csh-section-title' }, tr('importTitle')),
+                  h('div', { className: 'csh-master-note', style: { marginTop: 4 } }, tr('importSubtitle')),
+                ),
+                h('button', { type: 'button', className: 'csh-btn small', disabled: importLoading, onClick: () => void loadImport() }, importLoading ? tr('refreshing') : tr('importRefresh')),
+              ),
+              importError !== '' ? h('div', { className: 'csh-banner error' }, `${tr('actionFailed')}: ${importError}`) : null,
+              importPayload === null && importLoading ? h('div', { className: 'csh-banner' }, tr('refreshing')) : null,
+              importPayload === null && !importLoading ? h('div', { className: 'csh-banner warn' }, tr('importHint')) : null,
+              importPayload !== null ? h('div', null,
+                h('div', { className: 'csh-status-card' },
+                  h(Badge, { tone: importPayload.status.dbExists ? 'ok' : 'warn' }, `${tr('dbPath')}: ${importPayload.status.dbExists ? tr('dbFound') : tr('dbMissing')}`),
+                  h(Badge, { tone: importPayload.status.skillsExists ? 'ok' : 'warn' }, `${tr('importSkillsTitle')}: ${importPayload.status.skillsExists ? tr('skillsFound') : tr('skillsMissing')}`),
+                  h('span', { className: 'csh-status-path' }, importPayload.status.dir),
+                ),
+                importPayload.status.mcpError ? h('div', { className: 'csh-error' }, importPayload.status.mcpError) : null,
+                h('div', { className: 'csh-section' },
+                  h('div', { className: 'csh-section-head' },
+                    h('h3', { className: 'csh-section-title' }, tr('importMcpTitle')),
+                    h('button', { type: 'button', className: 'csh-btn small', disabled: busy === 'import-all:mcp', onClick: () => void importAll('mcp') }, tr('importAll')),
+                  ),
+                  importPayload.mcp.length === 0
+                    ? h('div', { className: 'csh-note' }, tr('importEmpty'))
+                    : h('div', { className: 'csh-list' }, importPayload.mcp.map((item) => h('div', { key: item.id, className: 'csh-row' },
+                        h('div', { className: 'csh-main' },
+                          h('div', { className: 'csh-name-line' },
+                            h('span', { className: 'csh-name' }, item.name),
+                            h(Badge, null, item.transport),
+                            item.unsupported ? h(Badge, { tone: 'warn' }, tr('importUnsupported')) : null,
+                            item.imported ? h(Badge, { tone: 'ok' }, tr('imported')) : null,
+                            item.conflict ? h(Badge, { tone: 'warn' }, tr('importConflict')) : null,
+                          ),
+                          h('div', { className: 'csh-desc' }, item.description || item.summary),
+                          h('div', { className: 'csh-meta' }, h('span', { className: 'csh-code' }, item.summary)),
+                        ),
+                        h('div', { className: 'csh-side' },
+                          h('button', {
+                            type: 'button',
+                            className: 'csh-btn small',
+                            disabled: busy === `import:${item.id}` || item.imported || item.conflict || Boolean(item.unsupported),
+                            onClick: () => void importOne('mcp', item.id),
+                          }, item.imported ? tr('imported') : tr('importOne')),
+                        ),
+                      ))),
+                  h('div', { className: 'csh-note' }, tr('importNote')),
+                ),
+                h('div', { className: 'csh-section' },
+                  h('div', { className: 'csh-section-head' },
+                    h('h3', { className: 'csh-section-title' }, tr('importSkillsTitle')),
+                    h('button', { type: 'button', className: 'csh-btn small', disabled: busy === 'import-all:skill', onClick: () => void importAll('skill') }, tr('importAll')),
+                  ),
+                  importPayload.skills.length === 0
+                    ? h('div', { className: 'csh-note' }, tr('importEmpty'))
+                    : h('div', { className: 'csh-list' }, importPayload.skills.map((item) => h('div', { key: item.name, className: 'csh-row' },
+                        h('div', { className: 'csh-main' },
+                          h('div', { className: 'csh-name-line' },
+                            h('span', { className: 'csh-name' }, item.name),
+                            item.installed ? h(Badge, { tone: 'ok' }, tr('importInstalled')) : null,
+                          ),
+                          h('div', { className: 'csh-desc' }, item.description || tr('noDescription')),
+                        ),
+                        h('div', { className: 'csh-side' },
+                          h('button', {
+                            type: 'button',
+                            className: 'csh-btn small',
+                            disabled: busy === `import:${item.name}` || item.installed,
+                            onClick: () => void importOne('skill', item.name),
+                          }, item.installed ? tr('importInstalled') : tr('importOne')),
+                        ),
+                      ))),
+                ),
+                importPayload.warnings?.length > 0 ? h('div', { className: 'csh-section' },
+                  h('div', { className: 'csh-section-title' }, tr('warnings')),
+                  h('ul', { className: 'csh-warnings' }, importPayload.warnings.map((warning, index) => h('li', { key: index }, warning))),
+                ) : null,
+              ) : null,
+            ),
+          ) : null,
 
           h('div', { className: 'csh-card' },
             h('details', { className: 'csh-advanced' },
-              h('summary', null, tr('openAdvanced')),
+              h('summary', null, tr('advanced')),
               h('div', { className: 'csh-form' },
                 h('div', { className: 'csh-field' },
                   h('label', { className: 'csh-label' }, tr('ccSwitchDir')),
-                  h('input', {
-                    className: 'csh-input',
-                    type: 'text',
-                    value: ccSwitchDir,
-                    placeholder: snapshot.resolved?.ccSwitchDir ?? '~/.cc-switch',
-                    onChange: (event) => setCcSwitchDir(event.target.value),
-                  }),
+                  h('input', { className: 'csh-input', value: ccSwitchDir, placeholder: snapshot.paths.ccSwitchDir, onChange: (event) => setCcSwitchDir(event.target.value) }),
                   h('div', { className: 'csh-note' }, tr('ccSwitchDirHint')),
                 ),
-                h('div', { className: 'csh-field' },
-                  h('label', { className: 'csh-label' }, tr('skillDirs')),
-                  h('textarea', {
-                    className: 'csh-input',
-                    rows: 3,
-                    value: skillDirs,
-                    placeholder: '~/.cc-switch/skills',
-                    onChange: (event) => setSkillDirs(event.target.value),
-                  }),
-                  h('div', { className: 'csh-note' }, tr('skillDirsHint')),
-                ),
                 h('div', { className: 'csh-field wide' },
-                  h('div', { className: 'csh-label' }, tr('sourcesTitle')),
-                  h('div', { className: 'csh-source-list' },
-                    (snapshot.sources ?? []).map((source) => h('div', {
-                      key: `${source.kind}:${source.id}`,
-                      className: 'csh-source-row',
-                    },
-                      h('span', { className: 'csh-source-name' }, source.label),
-                      h('span', { className: 'csh-source-path csh-code' }, source.path),
-                      source.shadow ? h(Badge, { tone: 'warn' }, tr('readonly')) : null,
-                      h('span', { className: `csh-badge${source.exists ? ' ok' : ''}` },
-                        source.exists ? `${source.count ?? 0} ${tr('itemsCount')}` : tr('sourceEmpty')),
-                    )),
-                  ),
+                  h('div', { className: 'csh-note' }, `${tr('skillsDir')}: ${snapshot.paths.skillsDir}`),
+                  h('div', { className: 'csh-note' }, `${tr('disabledDir')}: ${snapshot.paths.disabledSkillsDir}`),
+                  h('div', { className: 'csh-note' }, `${tr('dbPath')}: ${snapshot.paths.ccSwitchDb}`),
                 ),
-                h('div', { className: 'csh-save-row' },
-                  h('span', { className: 'csh-save-note' }, saveNote),
-                  h('button', {
-                    type: 'button',
-                    className: 'csh-btn primary',
-                    disabled: saving,
-                    onClick: () => void saveConfig(),
-                  }, saving ? tr('saving') : tr('saveConfig')),
+                h('div', { className: 'csh-form-actions' },
+                  h('span', { className: 'csh-form-note' }, configNote),
+                  h('button', { type: 'button', className: 'csh-btn primary small', disabled: busy === 'config', onClick: () => void saveConfig() }, busy === 'config' ? tr('saving') : tr('saveConfig')),
                 ),
               ),
             ),
           ),
 
-          h('div', { className: 'csh-footer' }, `${tr('stateFile')}: ${snapshot.stateFile ?? '—'}`),
+          h('div', { className: 'csh-footer' }, `${tr('stateFile')}: ${snapshot.stateFile} · v${snapshot.pluginVersion ?? ''}`),
         ),
       )
     }
@@ -718,7 +1074,7 @@ window.__ModuleLoader__.load({
     return {
       inject: ['slots', 'locale'],
       apply(ctx) {
-        ctx.effect(() => ctx.locale.register(NS, { zh: ZH, en: EN }), 'ccswitch-hub: dictionaries')
+        ctx.effect(() => ctx.locale.register(NS, { zh: ZH, en: EN }), 'ccswitch-hub:dictionaries')
         tr = ctx.locale.bind(NS)
 
         ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({

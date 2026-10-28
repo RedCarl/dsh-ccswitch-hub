@@ -19,6 +19,7 @@ function element(type, props, children) {
 function makeReact(stateValues) {
   let index = 0
   return {
+    Fragment: Symbol.for('react.fragment'),
     createElement: (type, props, ...children) => element(type, props, children),
     useState: (initial) => {
       const value = index < stateValues.length ? stateValues[index] : initial
@@ -34,58 +35,84 @@ function makeReact(stateValues) {
 function snapshot(overrides = {}) {
   return {
     ok: true,
-    panel: 'ccswitch-hub',
+    version: 2,
+    pluginVersion: '2.1.0',
     stateFile: '/tmp/dsh/ccswitch-hub/state.json',
-    config: { ccSwitchDir: null, skillDirs: [] },
-    resolved: {
+    config: { ccSwitchDir: null },
+    paths: {
+      skillsDir: '/tmp/dsh/skills',
+      disabledSkillsDir: '/tmp/dsh/ccswitch-hub/disabled-skills',
       ccSwitchDir: '/home/me/.cc-switch',
       ccSwitchDb: '/home/me/.cc-switch/cc-switch.db',
-      agentsSkills: '/home/me/.agents/skills',
     },
-    sources: [
-      { id: 'ccswitch', kind: 'mcp', exists: true },
-      { id: 'ccswitch', kind: 'skills', exists: true },
-    ],
-    warnings: ['fixture warning'],
     mcp: {
       master: true,
       items: [{
-        key: 'ccswitch:github',
+        id: 'mcp-1',
         name: 'GitHub',
-        description: 'GitHub tools',
-        tags: ['dev'],
-        origins: ['cc-switch', 'claude'],
-        apps: ['claude'],
         transport: 'stdio',
-        runtimeName: 'github',
         summary: 'stdio · npx · 2 args',
-        conflict: false,
-        unsupported: undefined,
-        envKeys: ['GITHUB_TOKEN'],
-        headerKeys: [],
+        runtimeName: 'github',
         enabled: true,
         master: true,
         status: 'ready',
         toolCount: 3,
+        error: undefined,
         serverName: 'github',
+        envKeys: ['GITHUB_TOKEN'],
+        headerKeys: [],
+        source: null,
+        updatedAt: 1,
         pending: false,
       }],
     },
     skills: {
-      master: true,
       items: [{
         name: 'alpha',
         description: 'Alpha skill',
-        path: '/home/me/.cc-switch/skills/alpha/SKILL.md',
-        source: 'cc-switch',
-        rootLabel: 'CC Switch',
-        controllable: true,
         enabled: true,
-        inRegistry: true,
-        missing: false,
+        kind: 'directory',
+        entryName: 'alpha',
+        entryPath: '/tmp/dsh/skills/alpha',
+        path: '/tmp/dsh/skills/alpha/SKILL.md',
       }],
     },
+    warnings: [],
     ...overrides,
+  }
+}
+
+function importPayload() {
+  return {
+    ok: true,
+    status: {
+      dir: '/home/me/.cc-switch',
+      dbPath: '/home/me/.cc-switch/cc-switch.db',
+      dbExists: true,
+      skillsPath: '/home/me/.cc-switch/skills',
+      skillsExists: true,
+      mcpError: undefined,
+    },
+    mcp: [{
+      id: 'ccswitch-1',
+      name: 'Remote tools',
+      description: 'Imported server',
+      summary: 'http · https://example.com/mcp',
+      transport: 'http',
+      apps: ['claude'],
+      envKeys: [],
+      headerKeys: ['Authorization'],
+      unsupported: undefined,
+      imported: false,
+      conflict: false,
+    }],
+    skills: [{
+      name: 'beta',
+      description: 'Beta skill',
+      kind: 'directory',
+      installed: false,
+    }],
+    warnings: [],
   }
 }
 
@@ -127,6 +154,7 @@ function loadClient(react) {
 function renderTree(node) {
   if (node === null || node === undefined || typeof node !== 'object') return node
   if (Array.isArray(node)) return node.map((child) => renderTree(child))
+  if (typeof node.type === 'symbol') return node.children.map((child) => renderTree(child))
   if (typeof node.type === 'function') {
     const props = node.children.length > 0 ? { ...node.props, children: node.children } : node.props
     return renderTree(node.type(props))
@@ -134,44 +162,77 @@ function renderTree(node) {
   return { type: node.type, props: node.props, children: node.children.map((child) => renderTree(child)) }
 }
 
-test('client page renders a populated MCP and skills snapshot', () => {
-  const { main, panel } = loadClient(makeReact([
-    snapshot(), '', '', false, '', 'mcp', '', '', '', false, '',
-  ]))
-  const tree = main()
-  assert.equal(tree.type, 'div')
-  const rendered = renderTree(tree)
+const baseState = (tab = 'mcp') => [
+  snapshot(), '', '', '', false, '', tab, '', null, '', '', null, false, '', '', '',
+]
+
+test('renders the native MCP tab and CSS', () => {
+  const { main, panel } = loadClient(makeReact(baseState('mcp')))
+  const rendered = renderTree(main())
   const text = JSON.stringify(rendered)
   assert.match(text, /csh-page/)
   assert.match(text, /GitHub/)
   assert.match(text, /mcp__github__/)
   assert.ok(text.includes('csh-btn.primary { background: var(--dsw-alias-button-primary-fill)'))
   assert.ok(text.includes('csh-switch[aria-checked'))
-  assert.ok(text.includes('state-business-primary'))
   assert.equal(text.includes('color: #fff'), false)
-  assert.match(text, /fixture warning/)
-
-  const skills = loadClient(makeReact([
-    snapshot(), '', '', false, '', 'skills', '', '', '', false, '',
-  ]))
-  const skillsText = JSON.stringify(renderTree(skills.main()))
-  assert.match(skillsText, /Alpha skill/)
-  assert.match(skillsText, /inRegistry/)
-
   const icon = panel({ size: 18, active: false })
   assert.equal(icon.type, 'svg')
 })
 
-test('client page renders the empty and error shells', () => {
-  const empty = loadClient(makeReact([
-    snapshot({ sources: [], warnings: [], mcp: { master: true, items: [] }, skills: { master: true, items: [] } }),
-    '', '', false, '', 'skills', '', '', '', false, '',
-  ]))
-  const emptyTree = renderTree(empty.main())
-  assert.match(JSON.stringify(emptyTree), /emptySkills/)
+test('renders the skills tab and the MCP editor', () => {
+  const { main } = loadClient(makeReact(baseState('skills')))
+  const skills = JSON.stringify(renderTree(main()))
+  assert.match(skills, /Alpha skill/)
+  assert.match(skills, /skillEnabled/)
 
-  const failed = loadClient(makeReact([null, 'boom', '', false, '', 'mcp', '', '', '', false, '']))
-  const errorTree = renderTree(failed.main())
-  assert.match(JSON.stringify(errorTree), /loadFailed/)
-  assert.match(JSON.stringify(errorTree), /boom/)
+  const withEditor = baseState('mcp')
+  withEditor[8] = { mode: 'new', detail: undefined }
+  const editor = JSON.stringify(renderTree(loadClient(makeReact(withEditor)).main()))
+  assert.match(editor, /addMcp/)
+  assert.match(editor, /csh-editor/)
+})
+
+test('renders the CC Switch import tab', () => {
+  const state = baseState('import')
+  state[11] = importPayload()
+  const { main } = loadClient(makeReact(state))
+  const text = JSON.stringify(renderTree(main()))
+  assert.match(text, /Remote tools/)
+  assert.match(text, /Beta skill/)
+  assert.match(text, /importOne/)
+})
+
+test('renders the update banner and update errors', () => {
+  const state = baseState('mcp')
+  state[16] = {
+    ok: true,
+    current: '2.1.0',
+    latest: '2.2.0',
+    updateAvailable: true,
+    release: { url: 'https://github.com/RedCarl/dsh-ccswitch-hub/releases/tag/v2.2.0' },
+    installable: true,
+  }
+  const banner = JSON.stringify(renderTree(loadClient(makeReact(state)).main()))
+  assert.match(banner, /newVersion/)
+  assert.match(banner, /2\.2\.0/)
+
+  const failed = baseState('mcp')
+  failed[16] = { ok: false, current: '2.1.0', updateAvailable: false, installable: true }
+  failed[19] = 'network down'
+  const error = JSON.stringify(renderTree(loadClient(makeReact(failed)).main()))
+  assert.match(error, /updateFailed/)
+  assert.match(error, /network down/)
+})
+
+test('renders the empty state and the fatal error shell', () => {
+  const empty = baseState('mcp')
+  empty[0] = snapshot({ mcp: { master: true, items: [] }, skills: { items: [] } })
+  const emptyText = JSON.stringify(renderTree(loadClient(makeReact(empty)).main()))
+  assert.match(emptyText, /emptyMcp/)
+
+  const failed = [null, 'boom', '', '', false, '', 'mcp', '', null, '', '', null, false, '', '', '']
+  const errorText = JSON.stringify(renderTree(loadClient(makeReact(failed)).main()))
+  assert.match(errorText, /loadFailed/)
+  assert.match(errorText, /boom/)
 })
