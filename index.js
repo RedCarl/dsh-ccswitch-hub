@@ -13,7 +13,7 @@ import { McpRuntime, listMcpToolServers, runtimeServerName, summarizeMcp } from 
 import { deleteSkill, importSkill, scanSkills, setSkillEnabled } from './lib/native-skills.js'
 import { resolvePaths, stringValue } from './lib/paths.js'
 import { defaultState, loadState, saveState, setCcSwitchDir } from './lib/state.js'
-import { REPO_URL, compareVersions, evaluateUpdate, fetchLatestRelease, readPackageVersion, releaseTarballAsset } from './lib/update.js'
+import { applyUpdate, checkForUpdate, readPackageVersion, resolveInstall, scheduleReload } from './lib/update.js'
 import { errorMessage, isRecord, truncate } from './lib/util.js'
 
 /** Loader entry name used by diagnostics. */
@@ -25,8 +25,8 @@ export const inject = ['webServer']
 const BASE = '/plugins/ccswitch-hub'
 const BODY_LIMIT = 256 * 1024
 const DEFAULT_TIMEOUT_MS = 60_000
-const PLUGIN_VERSION = readPackageVersion(import.meta.url)
-const UPDATE_TTL_MS = 5 * 60_000
+const PACKAGE_NAME = '@local/dsh-ccswitch-hub'
+const PLUGIN_VERSION = readPackageVersion(import.meta.url) ?? '0.0.0'
 
 function namedLogger(ctx) {
   try {
@@ -403,8 +403,6 @@ export function apply(ctx, rawConfig) {
     }
   }
 
-  let updateCache = { at: 0, info: null }
-
   function updateInstallable() {
     try {
       const manager = ctx.get?.('pluginManager')
@@ -415,39 +413,16 @@ export function apply(ctx, rawConfig) {
   }
 
   async function updateInfo(force) {
-    const now = Date.now()
-    const ttl = updateCache.info?.ok === false ? 60_000 : UPDATE_TTL_MS
-    if (force !== true && updateCache.info !== null && now - updateCache.at < ttl) return updateCache.info
-    let info
-    const installed = readPackageVersion(import.meta.url)
-    try {
-      const release = await fetchLatestRelease({ userAgent: `dsh-ccswitch-hub/${PLUGIN_VERSION}` })
-      const decision = evaluateUpdate(PLUGIN_VERSION, installed, release.version)
-      info = {
-        ok: true,
-        current: PLUGIN_VERSION,
-        installed,
-        latest: release.version,
-        ...decision,
-        release,
-        installable: updateInstallable(),
-        checkedAt: new Date().toISOString(),
-      }
-    } catch (error) {
-      info = {
-        ok: false,
-        current: PLUGIN_VERSION,
-        installed,
-        latest: null,
-        updateAvailable: false,
-        restartRequired: compareVersions(installed, PLUGIN_VERSION) > 0,
-        error: truncate(errorMessage(error), 600),
-        installable: updateInstallable(),
-        checkedAt: new Date().toISOString(),
-      }
-    }
-    updateCache = { at: now, info }
-    return info
+    const install = resolveInstall({ metaUrl: import.meta.url, packageName: PACKAGE_NAME })
+    return checkForUpdate({
+      packageName: PACKAGE_NAME,
+      currentVersion: PLUGIN_VERSION,
+      installedVersion: readPackageVersion(install.packageDir),
+      mode: install.mode,
+      installable: updateInstallable(),
+      force,
+      userAgent: `dsh-ccswitch-hub/${PLUGIN_VERSION}`,
+    })
   }
 
   function findItem(id) {
@@ -722,12 +697,12 @@ export function apply(ctx, rawConfig) {
     try {
       const manager = ctx.get?.('pluginManager')
       if (!manager || typeof manager.installBundle !== 'function') {
-        throw new Error('当前 Host 不支持一键更新；请在终端运行 dsh plugin add ' + REPO_URL)
+        throw new Error(`当前 Host 不支持一键更新；请在终端运行 dsh plugin --profile <name> add ${PACKAGE_NAME}@latest`)
       }
       const info = await updateInfo(true)
       if (info.ok !== true) throw new Error(info.error ?? '检查更新失败')
+      const install = resolveInstall({ metaUrl: import.meta.url, packageName: PACKAGE_NAME })
       const respondInstalled = (installedVersion, extra = {}) => {
-        updateCache = { at: 0, info: null }
         sendJson(res, 200, {
           ok: true,
           current: PLUGIN_VERSION,
@@ -743,51 +718,44 @@ export function apply(ctx, rawConfig) {
       }
       if (info.updateAvailable !== true) {
         if (info.restartRequired === true) {
-          respondInstalled(info.installed ?? readPackageVersion(import.meta.url))
+          respondInstalled(info.installed ?? readPackageVersion(install.packageDir))
           return
         }
         throw new Error(`已是最新版本 v${info.current}`)
       }
-      const asset = releaseTarballAsset(info.release)
       let result
       try {
-        result = await manager.installBundle(asset?.url ?? REPO_URL, { saveExact: false })
+        result = await applyUpdate({
+          packageName: PACKAGE_NAME,
+          targetVersion: info.latest,
+          mode: install.mode,
+          packageDir: install.packageDir,
+          pluginManager: manager,
+          tarballUrl: info.tarball,
+        })
       } catch (error) {
         if (error?.code === 'already-installed' || error?.error?.code === 'already-installed'
           || String(errorMessage(error)).includes('already-installed')) {
-          respondInstalled(readPackageVersion(import.meta.url))
+          respondInstalled(readPackageVersion(install.packageDir))
           return
         }
         throw error
       }
-      if (result?.error?.code === 'already-installed') {
-        respondInstalled(readPackageVersion(import.meta.url))
-        return
-      }
-      updateCache = { at: 0, info: null }
-      const application = typeof result?.application === 'string' ? result.application : 'unknown'
-      const failure = result?.error
-        ? (typeof result.error.message === 'string' ? result.error.message : truncate(JSON.stringify(result.error), 600))
-        : undefined
-      const installedVersion = typeof result?.version === 'string'
-        ? result.version
-        : readPackageVersion(import.meta.url)
-      const reloadRequired = application === 'restart-required'
-        || compareVersions(installedVersion, PLUGIN_VERSION) > 0
+      if (result.method === 'git') scheduleReload(ctx, PACKAGE_NAME)
       sendJson(res, 200, {
-        ok: application !== 'failed' && application !== 'cancelled',
+        ok: result.application !== 'failed',
         current: PLUGIN_VERSION,
         latest: info.latest,
         result: {
-          application,
-          stage: result?.stage,
-          version: result?.version,
-          installedVersion,
-          reloadRequired,
-          restartReason: result?.restartReason,
-          warnings: result?.warnings,
-          pendingBuilds: result?.pendingBuilds,
-          error: failure,
+          application: result.application ?? (result.restartRequired ? 'restart-required' : 'applied'),
+          stage: result.stage,
+          version: result.to,
+          installedVersion: result.to,
+          reloadRequired: result.restartRequired,
+          restartReason: result.restartReason,
+          warnings: result.warnings,
+          pendingBuilds: result.pendingBuilds,
+          error: result.error,
         },
       })
     } catch (error) {

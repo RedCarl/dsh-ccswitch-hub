@@ -8,34 +8,32 @@ DeepSeek Harness 的 **原生 MCP 服务器与技能管理器**：
 
 > CC Switch 只是可选的导入来源，不是本插件的主要功能。本插件不会读取 Claude Code、Codex 或 Gemini CLI 的 MCP/技能。
 
-## 安装（无需 npm）
+## 安装
 
-直接从 GitHub 安装（推荐）：
+从私有 npm 源安装（推荐）：
 
 ```sh
-dsh plugin --profile web add https://github.com/RedCarl/dsh-ccswitch-hub
+dsh plugin --profile web add @local/dsh-ccswitch-hub@latest
 ```
 
-也可以在 DSH 的「设置 → 插件」中粘贴这个 GitHub 地址；安装后刷新页面。
-
-离线或锁定版本时，从 [GitHub Releases](https://github.com/RedCarl/dsh-ccswitch-hub/releases) 下载 `*.tgz`，在安装框中粘贴本地绝对路径。
-
-> 不需要 npmjs 账号；本插件通过 GitHub 仓库和 GitHub Release 分发。
+profile 需要认识 `@local` scope（`dsh-registry enable --profile web` 会写入
+`@local:registry=https://npm.carljoy.cn/`）。也可以直接在
+[npm.carljoy.cn](https://npm.carljoy.cn/) 的 Web 界面下载 tgz 离线安装。
 
 ## 自动检查更新
 
 页面右上角会显示 **检查更新** 按钮：
 
-- 打开页面时自动检查一次 GitHub Release，5 分钟内复用结果；
-- 有新版本时显示版本号和 Release 链接，可 **一键更新**；
-- 更新通过 Host 的插件管理器安装 Release 包；Host 端新版本需要重启 Harness 后生效；
-- 如果更新包已安装但 Host 仍运行旧版本，页面会显示“需要重启 Harness”，不会重复安装或报 `already-installed`；
+- 打开页面时自动检查一次私有源里的 `dist-tags.latest`，10 分钟内复用结果；
+- 有新版本时显示版本号和私有源页面链接，可 **一键更新**；
+- 更新通过 Host 的插件管理器安装 registry 上的同一版本；HMR 拒绝覆盖已安装包时回退到该版本的 registry tarball；
+- Host 端新版本需要重启 Harness 后生效；如果更新包已安装但 Host 仍运行旧版本，页面会显示“需要重启 Harness”；
 - 如果当前 Host 没有插件管理器（例如 TUI），会提示在终端手动安装。
 
-更新只针对本仓库的 GitHub 发布：
+手动升级：
 
 ```sh
-dsh plugin --profile web add https://github.com/RedCarl/dsh-ccswitch-hub
+dsh plugin --profile web add @local/dsh-ccswitch-hub@latest
 ```
 
 ## 打开方式
@@ -97,6 +95,9 @@ node --test
 ```
 
 ## 发布
+
+现在插件检查更新读取私有源 `npm.carljoy.cn`，GitHub Release 只作为归档。发布新版本时运行
+`node ../dsh-registry/bin/dsh-registry.mjs publish . --bump patch --deploy`，会同时刷新市场索引。
 
 推送 `v*` 标签会触发 GitHub Actions：`npm pack` 生成 `.tgz` 并上传到对应的 GitHub Release。发布新版本时先更新 `package.json` 的 `version`，提交后：
 
