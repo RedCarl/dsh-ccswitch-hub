@@ -108,11 +108,13 @@ window.__ModuleLoader__.load({
       currentVersion: '当前',
       releaseNotes: 'Release 说明',
       updateApplied: '更新已应用，请刷新页面。',
-      updateRestart: '更新已安装，需要重启 Harness 后生效。',
       updateOverridden: '更新已安装，但当前入口被更高优先级配置覆盖。',
       updateCancelled: '更新已取消。',
       updateFailed: '更新失败',
       updateUnsupported: '当前 Host 不支持一键更新，请在终端手动安装。',
+      restartRequired: '需要重启 Harness',
+      restartHint: '更新包已安装，重启 Harness 后生效。',
+      installedVersion: '已安装',
       warnings: '提示',
       loadFailed: '无法读取状态',
       retryLoad: '重新加载',
@@ -220,11 +222,13 @@ window.__ModuleLoader__.load({
       currentVersion: 'Current',
       releaseNotes: 'Release notes',
       updateApplied: 'Update applied; refresh the page.',
-      updateRestart: 'Update installed; restart Harness to use it.',
       updateOverridden: 'Update installed, but a higher-priority entry overrides this one.',
       updateCancelled: 'Update cancelled.',
       updateFailed: 'Update failed',
       updateUnsupported: 'This Host cannot install updates; run the command in a terminal.',
+      restartRequired: 'Restart required',
+      restartHint: 'The update is installed; restart Harness to use it.',
+      installedVersion: 'Installed',
       warnings: 'Notes',
       loadFailed: 'Could not read status',
       retryLoad: 'Reload',
@@ -596,12 +600,6 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function reasonText(value) {
-      if (value === undefined || value === null || value === '') return ''
-      if (typeof value === 'string') return value
-      try { return JSON.stringify(value) } catch { return String(value) }
-    }
-
     function Page() {
       const [snapshot, setSnapshot] = React.useState(null)
       const [loadError, setLoadError] = React.useState('')
@@ -694,19 +692,20 @@ window.__ModuleLoader__.load({
           const application = payload.result?.application
           const installed = payload.result?.installedVersion ?? payload.result?.version
           const reloadRequired = payload.result?.reloadRequired === true || application === 'restart-required'
-          if (reloadRequired) {
-            setUpdateNote(`${tr('updateRestart')}${installed ? ` (v${installed})` : ''}${payload.result?.restartReason ? ` ${reasonText(payload.result.restartReason)}` : ''}`)
-          } else if (application === 'overridden') {
-            setUpdateNote(tr('updateOverridden'))
-          } else if (application === 'cancelled') {
-            throw new Error(tr('updateCancelled'))
-          } else {
-            setUpdateNote(`${tr('updateApplied')}${installed ? ` (v${installed})` : ''}`)
+          if (!reloadRequired) {
+            if (application === 'overridden') {
+              setUpdateNote(tr('updateOverridden'))
+            } else if (application === 'cancelled') {
+              throw new Error(tr('updateCancelled'))
+            } else {
+              setUpdateNote(`${tr('updateApplied')}${installed ? ` (v${installed})` : ''}`)
+            }
           }
           setUpdateInfo((current) => current === null ? current : {
             ...current,
             updateAvailable: false,
-            current: installed ?? current.current,
+            restartRequired: reloadRequired,
+            installed: installed ?? current.installed,
             latest: installed ?? current.latest,
           })
           if (application === 'applied' && !reloadRequired) {
@@ -850,12 +849,14 @@ window.__ModuleLoader__.load({
                     disabled: updateBusy || updateInfo.installable === false,
                     onClick: () => void runUpdate(),
                   }, updateBusy ? tr('updating') : `${tr('updateTo')} v${updateInfo.latest}`)
-                : h('button', {
-                    type: 'button',
-                    className: 'csh-btn',
-                    disabled: updateChecking,
-                    onClick: () => void loadUpdate(true, true),
-                  }, updateChecking ? tr('checkingUpdate') : (updateInfo?.ok === true ? `${tr('upToDate')} · v${updateInfo.current}` : tr('checkUpdate'))),
+                : updateInfo?.restartRequired
+                  ? h(Badge, { tone: 'warn' }, `${tr('restartRequired')} · v${updateInfo.installed ?? updateInfo.latest}`)
+                  : h('button', {
+                      type: 'button',
+                      className: 'csh-btn',
+                      disabled: updateChecking,
+                      onClick: () => void loadUpdate(true, true),
+                    }, updateChecking ? tr('checkingUpdate') : (updateInfo?.ok === true ? `${tr('upToDate')} · v${updateInfo.current}` : tr('checkUpdate'))),
               h('button', { type: 'button', className: 'csh-btn', onClick: () => { void load(); if (tab === 'import') void loadImport() } }, tr('refresh')),
             ),
           ),
@@ -883,6 +884,12 @@ window.__ModuleLoader__.load({
                     disabled: updateBusy,
                     onClick: () => void runUpdate(),
                   }, updateBusy ? tr('updating') : `${tr('updateTo')} v${updateInfo.latest}`),
+            ),
+          ) : updateInfo?.restartRequired ? h('div', { className: 'csh-banner warn' },
+            h('div', { className: 'csh-update-line' },
+              h('strong', null, tr('restartRequired')),
+              h('span', { className: 'csh-note', style: { marginTop: 0 } }, `${tr('installedVersion')} v${updateInfo.installed ?? updateInfo.latest} · ${tr('currentVersion')} v${updateInfo.current}`),
+              h('span', { className: 'csh-note', style: { marginTop: 0 } }, tr('restartHint')),
             ),
           ) : null,
           updateError !== '' ? h('div', { className: 'csh-banner error' }, `${tr('updateFailed')}: ${updateError}`) : null,

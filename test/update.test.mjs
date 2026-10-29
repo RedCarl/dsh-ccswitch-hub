@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import {
   RELEASE_API,
   compareVersions,
+  evaluateUpdate,
   fetchLatestRelease,
   isNewer,
   parseVersion,
@@ -25,6 +26,13 @@ test('compares versions numerically and ignores a leading v', () => {
   assert.equal(compareVersions('abc', '0.0.0'), 0)
   assert.equal(isNewer('2.1.0', '2.0.0'), true)
   assert.equal(isNewer('2.0.0', '2.1.0'), false)
+})
+
+test('separates a downloadable update from a pending restart', () => {
+  assert.deepEqual(evaluateUpdate('2.1.1', '2.1.1', '2.1.2'), { updateAvailable: true, restartRequired: false })
+  assert.deepEqual(evaluateUpdate('2.1.1', '2.1.2', '2.1.2'), { updateAvailable: false, restartRequired: true })
+  assert.deepEqual(evaluateUpdate('2.1.1', '2.1.3', '2.1.2'), { updateAvailable: false, restartRequired: true })
+  assert.deepEqual(evaluateUpdate('2.1.2', '2.1.2', '2.1.2'), { updateAvailable: false, restartRequired: false })
 })
 
 test('reads the running manifest version', () => {

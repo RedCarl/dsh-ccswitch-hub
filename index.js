@@ -13,7 +13,7 @@ import { McpRuntime, runtimeServerName, summarizeMcp } from './lib/mcp.js'
 import { deleteSkill, importSkill, scanSkills, setSkillEnabled } from './lib/native-skills.js'
 import { resolvePaths, stringValue } from './lib/paths.js'
 import { defaultState, loadState, saveState, setCcSwitchDir } from './lib/state.js'
-import { REPO_URL, compareVersions, fetchLatestRelease, readPackageVersion, releaseTarballAsset } from './lib/update.js'
+import { REPO_URL, compareVersions, evaluateUpdate, fetchLatestRelease, readPackageVersion, releaseTarballAsset } from './lib/update.js'
 import { errorMessage, isRecord, truncate } from './lib/util.js'
 
 /** Loader entry name used by diagnostics. */
@@ -249,13 +249,16 @@ export function apply(ctx, rawConfig) {
     const ttl = updateCache.info?.ok === false ? 60_000 : UPDATE_TTL_MS
     if (force !== true && updateCache.info !== null && now - updateCache.at < ttl) return updateCache.info
     let info
+    const installed = readPackageVersion(import.meta.url)
     try {
       const release = await fetchLatestRelease({ userAgent: `dsh-ccswitch-hub/${PLUGIN_VERSION}` })
+      const decision = evaluateUpdate(PLUGIN_VERSION, installed, release.version)
       info = {
         ok: true,
         current: PLUGIN_VERSION,
+        installed,
         latest: release.version,
-        updateAvailable: compareVersions(release.version, PLUGIN_VERSION) > 0,
+        ...decision,
         release,
         installable: updateInstallable(),
         checkedAt: new Date().toISOString(),
@@ -264,8 +267,10 @@ export function apply(ctx, rawConfig) {
       info = {
         ok: false,
         current: PLUGIN_VERSION,
+        installed,
         latest: null,
         updateAvailable: false,
+        restartRequired: compareVersions(installed, PLUGIN_VERSION) > 0,
         error: truncate(errorMessage(error), 600),
         installable: updateInstallable(),
         checkedAt: new Date().toISOString(),
@@ -503,9 +508,44 @@ export function apply(ctx, rawConfig) {
       }
       const info = await updateInfo(true)
       if (info.ok !== true) throw new Error(info.error ?? '检查更新失败')
-      if (info.updateAvailable !== true) throw new Error(`已是最新版本 v${info.current}`)
+      const respondInstalled = (installedVersion, extra = {}) => {
+        updateCache = { at: 0, info: null }
+        sendJson(res, 200, {
+          ok: true,
+          current: PLUGIN_VERSION,
+          latest: info.latest,
+          result: {
+            application: 'restart-required',
+            installedVersion,
+            reloadRequired: true,
+            alreadyInstalled: true,
+            ...extra,
+          },
+        })
+      }
+      if (info.updateAvailable !== true) {
+        if (info.restartRequired === true) {
+          respondInstalled(info.installed ?? readPackageVersion(import.meta.url))
+          return
+        }
+        throw new Error(`已是最新版本 v${info.current}`)
+      }
       const asset = releaseTarballAsset(info.release)
-      const result = await manager.installBundle(asset?.url ?? REPO_URL, { saveExact: false })
+      let result
+      try {
+        result = await manager.installBundle(asset?.url ?? REPO_URL, { saveExact: false })
+      } catch (error) {
+        if (error?.code === 'already-installed' || error?.error?.code === 'already-installed'
+          || String(errorMessage(error)).includes('already-installed')) {
+          respondInstalled(readPackageVersion(import.meta.url))
+          return
+        }
+        throw error
+      }
+      if (result?.error?.code === 'already-installed') {
+        respondInstalled(readPackageVersion(import.meta.url))
+        return
+      }
       updateCache = { at: 0, info: null }
       const application = typeof result?.application === 'string' ? result.application : 'unknown'
       const failure = result?.error

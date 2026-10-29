@@ -28,7 +28,8 @@ dsh plugin --profile web add https://github.com/RedCarl/dsh-ccswitch-hub
 
 - 打开页面时自动检查一次 GitHub Release，5 分钟内复用结果；
 - 有新版本时显示版本号和 Release 链接，可 **一键更新**；
-- 更新通过 Host 的插件管理器安装 Release 包；Host 端新版本通常需要重启 Harness（或重新启用插件）后生效；
+- 更新通过 Host 的插件管理器安装 Release 包；Host 端新版本需要重启 Harness 后生效；
+- 如果更新包已安装但 Host 仍运行旧版本，页面会显示“需要重启 Harness”，不会重复安装或报 `already-installed`；
 - 如果当前 Host 没有插件管理器（例如 TUI），会提示在终端手动安装。
 
 更新只针对本仓库的 GitHub 发布：
@@ -99,6 +100,6 @@ node --test
 推送 `v*` 标签会触发 GitHub Actions：`npm pack` 生成 `.tgz` 并上传到对应的 GitHub Release。发布新版本时先更新 `package.json` 的 `version`，提交后：
 
 ```bash
-git tag v2.1.2
-git push origin v2.1.2
+git tag v2.1.3
+git push origin v2.1.3
 ```

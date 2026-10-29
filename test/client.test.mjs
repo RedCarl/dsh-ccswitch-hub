@@ -225,6 +225,23 @@ test('renders the update banner and update errors', () => {
   assert.match(error, /network down/)
 })
 
+test('renders a pending restart without offering the same update again', () => {
+  const state = baseState('mcp')
+  state[16] = {
+    ok: true,
+    current: '2.1.1',
+    installed: '2.1.2',
+    latest: '2.1.2',
+    updateAvailable: false,
+    restartRequired: true,
+    installable: true,
+  }
+  const text = JSON.stringify(renderTree(loadClient(makeReact(state)).main()))
+  assert.match(text, /restartRequired/)
+  assert.match(text, /restartHint/)
+  assert.equal(text.includes('updateTo'), false)
+})
+
 test('renders the empty state and the fatal error shell', () => {
   const empty = baseState('mcp')
   empty[0] = snapshot({ mcp: { master: true, items: [] }, skills: { items: [] } })
