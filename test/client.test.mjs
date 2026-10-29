@@ -229,13 +229,18 @@ test('renders the update banner and update errors', () => {
 test('renders existing Harness MCPs and shadowed duplicates', () => {
   const state = baseState('mcp')
   const managed = snapshot()
-  managed.mcp.harness = [{ serverName: 'dbx', toolCount: 4, source: 'tools' }]
+  managed.mcp.harness = [
+    { serverName: 'dbx', toolCount: 4, source: 'profile', transport: 'stdio', enabled: true, manageable: true, editable: true, entryId: 'dbx' },
+    { serverName: 'preset-only', toolCount: 1, source: 'preset', transport: 'unknown', enabled: true, manageable: false, editable: false },
+  ]
   managed.mcp.items = [{ ...managed.mcp.items[0], name: 'dbx', shadowedBy: 'dbx', status: 'off', pending: false }]
   state[0] = managed
   const text = JSON.stringify(renderTree(loadClient(makeReact(state)).main()))
   assert.match(text, /harnessMcpTitle/)
   assert.match(text, /dbx/)
   assert.match(text, /shadowedBy/)
+  assert.match(text, /readOnly/)
+  assert.match(text, /mcp__dbx__/)
 })
 
 test('renders a pending restart without offering the same update again', () => {

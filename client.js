@@ -117,7 +117,9 @@ window.__ModuleLoader__.load({
       namespaceHint: '插件管理的 MCP 使用 csh- 前缀 + 短哈希作为运行时 serverName，避免与 cordis.yml 中已有的 MCP 冲突。',
       harnessMcpTitle: 'Harness 已有 MCP',
       harnessMcpBadge: 'Harness 配置',
-      harnessMcpDesc: '由 cordis.yml 或预设直接启动；这里只识别，不会重复启动。',
+      harnessMcpDesc: '由 cordis.yml 或预设启动；profile 中的条目可直接启停和编辑，预设/工具注册表条目只读。',
+      readOnly: '只读',
+      editHarness: '编辑 Harness MCP',
       shadowed: '已跳过',
       shadowedBy: 'Harness 已有同名 MCP，已跳过该重复条目：',
       harnessMcpImport: 'Harness 已有',
@@ -239,7 +241,9 @@ window.__ModuleLoader__.load({
       namespaceHint: 'Plugin-managed MCP servers use a csh- prefix and short hash as their runtime serverName, avoiding collisions with MCPs already in cordis.yml.',
       harnessMcpTitle: 'Existing Harness MCPs',
       harnessMcpBadge: 'Harness config',
-      harnessMcpDesc: 'Started directly by cordis.yml or a preset; shown here for recognition, not started twice.',
+      harnessMcpDesc: 'Started by cordis.yml or a preset; profile entries can be toggled and edited here, preset/tool entries are read-only.',
+      readOnly: 'Read-only',
+      editHarness: 'Edit Harness MCP',
       shadowed: 'Skipped',
       shadowedBy: 'A Harness MCP with this name already exists; the duplicate is skipped:',
       harnessMcpImport: 'Already in Harness',
@@ -425,7 +429,7 @@ window.__ModuleLoader__.load({
       return h(Badge, null, tr('native'))
     }
 
-    function McpEditor({ detail, busy, onSave, onCancel }) {
+    function McpEditor({ detail, busy, external, onSave, onCancel }) {
       const editing = detail !== undefined
       const [form, setForm] = React.useState(() => ({
         name: detail?.name ?? '',
@@ -443,6 +447,7 @@ window.__ModuleLoader__.load({
       const submit = () => {
         onSave({
           id: detail?.id,
+          entryId: detail?.entryId,
           name: form.name,
           transport: form.transport,
           command: form.command,
@@ -457,7 +462,7 @@ window.__ModuleLoader__.load({
       }
       return h('div', { className: 'csh-editor' },
         h('div', { className: 'csh-editor-head' },
-          h('h2', { className: 'csh-editor-title' }, editing ? `${tr('edit')} · ${detail.name}` : tr('addMcp')),
+          h('h2', { className: 'csh-editor-title' }, editing ? `${external ? tr('editHarness') : tr('edit')} · ${detail.name}` : tr('addMcp')),
           h('div', { className: 'csh-row-actions' },
             h('button', { type: 'button', className: 'csh-btn small', disabled: busy, onClick: onCancel }, tr('cancel')),
             h('button', { type: 'button', className: 'csh-btn primary small', disabled: busy, onClick: submit }, busy ? tr('saving') : tr('save')),
@@ -479,7 +484,7 @@ window.__ModuleLoader__.load({
             h('label', { className: 'csh-label' }, tr('timeout')),
             h('input', { className: 'csh-input', type: 'number', min: 1000, max: 600000, step: 1000, value: form.toolCallTimeoutMs, onChange: set('toolCallTimeoutMs') }),
           ),
-          h('div', { className: 'csh-field' },
+          external ? null : h('div', { className: 'csh-field' },
             h('label', { className: 'csh-label' }, tr('enabled')),
             h('div', { className: 'csh-check-row' },
               h(Switch, {
@@ -792,11 +797,29 @@ window.__ModuleLoader__.load({
           setBusy('')
         }
       }
+      const openHarnessEdit = async (server) => {
+        if (typeof server.entryId !== 'string') return
+        setBusy(`harness:${server.entryId}`)
+        setActionError('')
+        try {
+          const payload = await requestJson(`${API}/harness-mcp-detail?entryId=${encodeURIComponent(server.entryId)}`)
+          setEditor({ mode: 'edit', target: 'harness', detail: payload.item })
+        } catch (error) {
+          setActionError(errorText(error))
+        } finally {
+          setBusy('')
+        }
+      }
       const saveMcp = async (form) => {
-        const payload = await act(`${API}/mcp-save`, form, 'editor')
+        const target = editor?.target === 'harness' ? 'harness' : 'native'
+        const payload = await act(target === 'harness' ? `${API}/harness-mcp-save` : `${API}/mcp-save`, form, 'editor')
         if (payload !== null) setEditor(null)
       }
       const toggleMcp = (item, enabled) => { void act(`${API}/mcp-toggle`, { id: item.id, enabled }, `mcp:${item.id}`) }
+      const toggleHarnessMcp = (server, enabled) => {
+        if (typeof server.entryId !== 'string') return
+        void act(`${API}/harness-mcp-toggle`, { entryId: server.entryId, enabled }, `harness:${server.entryId}`)
+      }
       const deleteMcp = async (item) => {
         const payload = await act(`${API}/mcp-delete`, { id: item.id }, `mcp:${item.id}`)
         if (payload !== null) { setConfirmMcp(''); setNotice(tr('mcpDeleted')) }
@@ -948,8 +971,9 @@ window.__ModuleLoader__.load({
             ),
             !snapshot.mcp.master ? h('div', { className: 'csh-banner warn' }, tr('masterOff')) : null,
             editor !== null ? h(McpEditor, {
-              key: editor.mode === 'edit' ? `edit:${editor.detail?.id}` : 'new',
+              key: editor.mode === 'edit' ? `edit:${editor.target ?? 'native'}:${editor.detail?.entryId ?? editor.detail?.id}` : 'new',
               detail: editor.detail,
+              external: editor.target === 'harness',
               busy: busy === 'editor',
               onSave: (form) => void saveMcp(form),
               onCancel: () => setEditor(null),
@@ -965,11 +989,29 @@ window.__ModuleLoader__.load({
                   h('div', { className: 'csh-name-line' },
                     h('span', { className: 'csh-name' }, server.serverName),
                     h(Badge, { tone: 'info' }, tr('harnessMcpBadge')),
+                    server.transport !== 'unknown' ? h(Badge, null, server.transport) : null,
                     server.toolCount > 0 ? h(Badge, null, `${server.toolCount} ${tr('tools')}`) : null,
                   ),
+                  h('div', { className: 'csh-meta' }, h('span', { className: 'csh-code' }, `mcp__${server.serverName}__`)),
                 ),
                 h('div', { className: 'csh-side' },
-                  h('span', { className: 'csh-status ready' }, h('span', { className: 'csh-dot' }), server.toolCount > 0 ? tr('statusReady') : tr('configured')),
+                  h('span', { className: `csh-status ${!server.enabled ? 'warn' : server.toolCount > 0 ? 'ready' : ''}` },
+                    h('span', { className: 'csh-dot' }),
+                    !server.enabled ? tr('disabled') : server.toolCount > 0 ? tr('statusReady') : tr('configured'),
+                  ),
+                  server.manageable === true
+                    ? h('div', { className: 'csh-row-actions' },
+                        server.editable === true
+                          ? h('button', { type: 'button', className: 'csh-btn small', disabled: busy === `harness:${server.entryId}`, onClick: () => void openHarnessEdit(server) }, tr('edit'))
+                          : null,
+                        h(Switch, {
+                          checked: server.enabled,
+                          busy: busy === `harness:${server.entryId}`,
+                          title: server.enabled ? tr('enabled') : tr('disabled'),
+                          onChange: (next) => toggleHarnessMcp(server, next),
+                        }),
+                      )
+                    : h(Badge, null, tr('readOnly')),
                 ),
               ))),
             ) : null,

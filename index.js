@@ -199,21 +199,120 @@ export function apply(ctx, rawConfig) {
     return new Set(Object.values(state.mcp.items).map((item) => runtimeServerName(item.id, item.name).toLowerCase()))
   }
 
-  /** Discover MCP servers owned by Harness itself, without exposing their configs or secrets. */
+  function isMcpClientEntry(entry) {
+    try {
+      const moduleName = entry?.options?.name
+      return moduleName === '@deepseek-ai/dsh-mcp-client'
+        || moduleName === 'mcp-client'
+        || entry?.moduleNamespace?.name === 'mcp-client'
+    } catch {
+      return false
+    }
+  }
+
+  /** Discover every MCP configured in Harness, including profile-managed and preset-owned rows. */
   function harnessMcpServers() {
     const own = ownRuntimeNames()
+    const canManage = (() => {
+      try {
+        return typeof ctx.get?.('pluginManager')?.setPluginEnabled === 'function'
+      } catch {
+        return false
+      }
+    })()
     const servers = new Map()
-    const add = (serverName, toolCount, source) => {
-      if (typeof serverName !== 'string' || serverName === '') return
-      if (own.has(serverName.toLowerCase())) return
-      const current = servers.get(serverName.toLowerCase())
+    const add = (candidate) => {
+      const name = stringValue(candidate?.serverName)
+      if (name === undefined || own.has(name.toLowerCase())) return
+      const key = name.toLowerCase()
+      const next = { ...candidate, serverName: name, toolCount: candidate.toolCount ?? 0 }
+      const current = servers.get(key)
       if (current === undefined) {
-        servers.set(serverName.toLowerCase(), { serverName, toolCount, source })
+        servers.set(key, next)
         return
       }
-      current.toolCount = Math.max(current.toolCount, toolCount)
-      if (current.toolCount > 0) current.source = 'tools'
+      current.toolCount = Math.max(current.toolCount, next.toolCount)
+      if (next.manageable === true) {
+        servers.set(key, { ...current, ...next, toolCount: current.toolCount })
+      } else if (current.manageable !== true && next.source === 'preset' && current.source === 'tools') {
+        servers.set(key, { ...next, toolCount: current.toolCount })
+      }
     }
+
+    const configOf = (entry) => (isRecord(entry?.options?.config) ? entry.options.config : undefined)
+    const transportOf = (config) => config?.transport === 'stdio'
+      ? 'stdio'
+      : config?.transport === 'streamable-http' ? 'http' : 'unknown'
+
+    try {
+      const editor = ctx.get?.('configEditor')
+      if (editor && typeof editor.entries === 'function') {
+        for (const entry of editor.entries()) {
+          if (!isMcpClientEntry(entry)) continue
+          const config = configOf(entry)
+          const serverName = stringValue(config?.serverName)
+          if (serverName === undefined) continue
+          const transport = transportOf(config)
+          add({
+            serverName,
+            toolCount: 0,
+            transport,
+            summary: summarizeMcp(serverName, transport, config),
+            enabled: entry.disabled !== true,
+            manageable: canManage,
+            editable: canManage && entry.disabled !== true && entry.fiber?.state === 2,
+            entryId: typeof entry.id === 'string' ? entry.id : undefined,
+            source: 'profile',
+          })
+        }
+      }
+    } catch {
+      // Profile discovery is best effort.
+    }
+
+    const entrySources = []
+    try {
+      if (ctx.loader !== undefined) entrySources.push(ctx.loader)
+    } catch {
+      // Optional loader access.
+    }
+    for (const serviceName of ['loader', 'configEditor']) {
+      try {
+        const service = ctx.get?.(serviceName)
+        if (service !== undefined) entrySources.push(service)
+      } catch {
+        // Optional service access.
+      }
+    }
+    for (const service of entrySources) {
+      try {
+        if (typeof service.entries !== 'function') continue
+        for (const entry of service.entries()) {
+          try {
+            if (!isMcpClientEntry(entry)) continue
+            const config = configOf(entry)
+            const serverName = stringValue(config?.serverName)
+            if (serverName === undefined) continue
+            const transport = transportOf(config)
+            add({
+              serverName,
+              toolCount: 0,
+              transport,
+              summary: summarizeMcp(serverName, transport, config),
+              enabled: entry.disabled !== true,
+              manageable: false,
+              editable: false,
+              source: 'preset',
+            })
+          } catch {
+            // A broken entry must not break the panel.
+          }
+        }
+      } catch {
+        // Loader discovery is best effort.
+      }
+    }
+
     const toolServices = []
     try {
       const rootTools = ctx.get?.('tools')
@@ -236,47 +335,23 @@ export function apply(ctx, rawConfig) {
     for (const service of toolServices) {
       try {
         const schemas = service.schemas?.() ?? []
-        for (const server of listMcpToolServers(schemas, [...own])) add(server.serverName, server.toolCount, 'tools')
+        for (const server of listMcpToolServers(schemas, [...own])) {
+          add({
+            serverName: server.serverName,
+            toolCount: server.toolCount,
+            transport: 'unknown',
+            summary: '',
+            enabled: true,
+            manageable: false,
+            editable: false,
+            source: 'tools',
+          })
+        }
       } catch {
         // Tool discovery is best effort.
       }
     }
-    const entrySources = []
-    try {
-      if (ctx.loader !== undefined) entrySources.push(ctx.loader)
-    } catch {
-      // Optional loader access.
-    }
-    for (const serviceName of ['loader', 'configEditor']) {
-      try {
-        const service = ctx.get?.(serviceName)
-        if (service !== undefined) entrySources.push(service)
-      } catch {
-        // Optional service access.
-      }
-    }
-    for (const service of entrySources) {
-      try {
-        if (typeof service.entries !== 'function') continue
-        for (const entry of service.entries()) {
-          try {
-            const moduleName = entry?.options?.name
-            const namespace = entry?.moduleNamespace?.name
-            if (moduleName !== '@deepseek-ai/dsh-mcp-client'
-              && moduleName !== 'mcp-client'
-              && namespace !== 'mcp-client') continue
-            if (entry.disabled === true) continue
-            const config = entry.options?.config
-            const serverName = stringValue(config?.serverName)
-            if (serverName !== undefined) add(serverName, 0, 'loader')
-          } catch {
-            // A broken entry must not break the panel.
-          }
-        }
-      } catch {
-        // Loader discovery is best effort.
-      }
-    }
+
     return [...servers.values()].sort((left, right) => left.serverName.localeCompare(right.serverName))
   }
 
@@ -377,6 +452,39 @@ export function apply(ctx, rawConfig) {
 
   function findItem(id) {
     return typeof id === 'string' ? state.mcp.items[id] : undefined
+  }
+
+  function findHarnessEntry(entryId) {
+    if (typeof entryId !== 'string' || entryId === '') return undefined
+    try {
+      const editor = ctx.get?.('configEditor')
+      for (const entry of editor?.entries?.() ?? []) {
+        if (isMcpClientEntry(entry) && String(entry.id) === entryId) return entry
+      }
+    } catch {
+      // Profile entries may be unavailable.
+    }
+    return undefined
+  }
+
+  function harnessMcpDetail(entry) {
+    const config = isRecord(entry.options?.config) ? entry.options.config : {}
+    const transport = config.transport === 'streamable-http' ? 'http' : 'stdio'
+    return {
+      entryId: String(entry.id),
+      name: stringValue(config.serverName) ?? '',
+      transport,
+      enabled: entry.disabled !== true,
+      editable: entry.disabled !== true && entry.fiber?.state === 2,
+      command: typeof config.command === 'string' ? config.command : '',
+      args: Array.isArray(config.args) ? config.args.filter((value) => typeof value === 'string') : [],
+      cwd: typeof config.cwd === 'string' ? config.cwd : '',
+      url: typeof config.url === 'string' ? config.url : '',
+      toolCallTimeoutMs: typeof config.toolCallTimeoutMs === 'number' ? config.toolCallTimeoutMs : DEFAULT_TIMEOUT_MS,
+      envKeys: Object.keys(isRecord(config.env) ? config.env : {}),
+      headerKeys: Object.keys(isRecord(config.headers) ? config.headers : {}),
+      source: { type: 'harness', id: String(entry.id), name: stringValue(config.serverName) ?? '' },
+    }
   }
 
   function nameConflict(name, exceptId) {
@@ -707,6 +815,10 @@ export function apply(ctx, rawConfig) {
       const existing = id === undefined ? undefined : findItem(id)
       if (id !== undefined && existing === undefined) throw new Error('找不到该 MCP 服务器')
       const values = validateMcp(body, existing)
+      const harnessConflict = harnessMcpServers().find((server) => server.serverName.toLowerCase() === values.name.toLowerCase())
+      if (harnessConflict !== undefined && (!existing || existing.name.toLowerCase() !== values.name.toLowerCase())) {
+        throw new Error(`Harness 已有同名 MCP：${harnessConflict.serverName}`)
+      }
       const nextId = existing?.id ?? `mcp-${crypto.randomUUID().slice(0, 8)}`
       const now = Date.now()
       const previous = existing ?? {}
@@ -728,6 +840,98 @@ export function apply(ctx, rawConfig) {
       sendJson(res, 200, statePayload())
     } catch (error) {
       sendJson(res, 400, { ok: false, error: truncate(errorMessage(error), 600) })
+    }
+  })
+
+  route(`${BASE}/harness-mcp-detail`, async (req, res) => {
+    if (!readOnly(req, res)) return
+    try {
+      const entryId = new URL(String(req.url), 'http://localhost').searchParams.get('entryId') ?? ''
+      const entry = findHarnessEntry(entryId)
+      if (entry === undefined) throw new Error('找不到该 Harness MCP 条目')
+      sendJson(res, 200, { ok: true, item: harnessMcpDetail(entry) })
+    } catch (error) {
+      sendJson(res, 404, { ok: false, error: truncate(errorMessage(error), 600) })
+    }
+  })
+
+  route(`${BASE}/harness-mcp-toggle`, async (req, res) => {
+    if (!writeOnly(req, res)) return
+    try {
+      const body = await readJsonBody(req)
+      const entry = findHarnessEntry(body.entryId)
+      if (entry === undefined) throw new Error('找不到该 Harness MCP 条目')
+      const manager = ctx.get?.('pluginManager')
+      if (!manager || typeof manager.setPluginEnabled !== 'function') {
+        throw new Error('当前 Host 不支持修改 Harness 配置')
+      }
+      const result = await manager.setPluginEnabled(String(entry.id), body.enabled === true)
+      if (result?.application === 'failed') {
+        throw new Error(result.error?.diagnostic ?? result.error?.code ?? '修改 Harness MCP 状态失败')
+      }
+      sendJson(res, 200, statePayload())
+    } catch (error) {
+      sendJson(res, 400, { ok: false, error: truncate(errorMessage(error), 800) })
+    }
+  })
+
+  route(`${BASE}/harness-mcp-save`, async (req, res) => {
+    if (!writeOnly(req, res)) return
+    try {
+      const body = await readJsonBody(req)
+      const entry = findHarnessEntry(body.entryId)
+      if (entry === undefined) throw new Error('找不到该 Harness MCP 条目')
+      if (entry.disabled === true) throw new Error('请先启用该 Harness MCP，再编辑配置')
+      const editor = ctx.get?.('configEditor')
+      if (!editor || typeof editor.edit !== 'function') throw new Error('当前 Host 不支持编辑 Harness 配置')
+      const current = isRecord(entry.options?.config) ? entry.options.config : {}
+      const name = typeof body.name === 'string' ? body.name.trim() : ''
+      if (!/^[A-Za-z0-9_-]{1,32}$/.test(name)) throw new Error('serverName 必须是 1-32 位字母、数字、下划线或短横线')
+      const currentName = (stringValue(current.serverName) ?? '').toLowerCase()
+      const pluginConflict = Object.values(state.mcp.items).find((item) => item.name.toLowerCase() === name.toLowerCase()
+        && item.name.toLowerCase() !== currentName)
+      if (pluginConflict !== undefined) throw new Error(`已存在同名插件 MCP：${pluginConflict.name}`)
+      const externalConflict = harnessMcpServers().find((server) => server.entryId !== String(entry.id)
+        && server.serverName.toLowerCase() === name.toLowerCase())
+      if (externalConflict !== undefined) throw new Error(`Harness 里已存在同名 MCP：${externalConflict.serverName}`)
+      const transport = body.transport === 'http' ? 'http' : body.transport === 'stdio' ? 'stdio' : undefined
+      if (transport === undefined) throw new Error('传输方式必须是 stdio 或 http')
+      const timeout = Number(body.toolCallTimeoutMs)
+      const toolCallTimeoutMs = Number.isFinite(timeout)
+        ? Math.max(1000, Math.min(600_000, Math.round(timeout)))
+        : DEFAULT_TIMEOUT_MS
+      const common = {
+        transport: transport === 'http' ? 'streamable-http' : 'stdio',
+        serverName: name,
+        toolCallTimeoutMs,
+        failOnStartupError: current.failOnStartupError !== false,
+        ...(typeof current.maxInstructionBytes === 'number' ? { maxInstructionBytes: current.maxInstructionBytes } : {}),
+        ...(current.reconnect !== undefined ? { reconnect: current.reconnect } : {}),
+      }
+      let next
+      if (transport === 'stdio') {
+        const command = typeof body.command === 'string' ? body.command.trim() : ''
+        if (command === '') throw new Error('stdio 必须填写 command')
+        next = {
+          ...common,
+          command,
+          args: parseArgs(body.argsText),
+          env: mergeSecrets(parseKeyValueLines(body.envText), isRecord(current.env) ? current.env : {}),
+          cwd: typeof body.cwd === 'string' ? body.cwd.trim() : '',
+        }
+      } else {
+        const url = typeof body.url === 'string' ? body.url.trim() : ''
+        if (!/^https?:\/\//i.test(url)) throw new Error('HTTP 必须填写 http(s) 地址')
+        next = {
+          ...common,
+          url,
+          headers: mergeSecrets(parseKeyValueLines(body.headersText), isRecord(current.headers) ? current.headers : {}),
+        }
+      }
+      await editor.edit(entry, () => next)
+      sendJson(res, 200, statePayload())
+    } catch (error) {
+      sendJson(res, 400, { ok: false, error: truncate(errorMessage(error), 800) })
     }
   })
 
