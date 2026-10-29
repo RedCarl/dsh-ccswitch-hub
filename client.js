@@ -115,6 +115,13 @@ window.__ModuleLoader__.load({
       restartRequired: '需要重启 Harness',
       restartHint: '更新包已安装，重启 Harness 后生效。',
       namespaceHint: '插件管理的 MCP 使用 csh- 前缀 + 短哈希作为运行时 serverName，避免与 cordis.yml 中已有的 MCP 冲突。',
+      harnessMcpTitle: 'Harness 已有 MCP',
+      harnessMcpBadge: 'Harness 配置',
+      harnessMcpDesc: '由 cordis.yml 或预设直接启动；这里只识别，不会重复启动。',
+      shadowed: '已跳过',
+      shadowedBy: 'Harness 已有同名 MCP，已跳过该重复条目：',
+      harnessMcpImport: 'Harness 已有',
+      configured: '已配置',
       installedVersion: '已安装',
       warnings: '提示',
       loadFailed: '无法读取状态',
@@ -230,6 +237,13 @@ window.__ModuleLoader__.load({
       restartRequired: 'Restart required',
       restartHint: 'The update is installed; restart Harness to use it.',
       namespaceHint: 'Plugin-managed MCP servers use a csh- prefix and short hash as their runtime serverName, avoiding collisions with MCPs already in cordis.yml.',
+      harnessMcpTitle: 'Existing Harness MCPs',
+      harnessMcpBadge: 'Harness config',
+      harnessMcpDesc: 'Started directly by cordis.yml or a preset; shown here for recognition, not started twice.',
+      shadowed: 'Skipped',
+      shadowedBy: 'A Harness MCP with this name already exists; the duplicate is skipped:',
+      harnessMcpImport: 'Already in Harness',
+      configured: 'Configured',
       installedVersion: 'Installed',
       warnings: 'Notes',
       loadFailed: 'Could not read status',
@@ -297,6 +311,7 @@ window.__ModuleLoader__.load({
       .csh-status.ready { color: var(--dsw-alias-state-success-primary); }
       .csh-status.error { color: var(--dsw-alias-state-error-primary); }
       .csh-status.connecting { color: var(--dsw-alias-state-business-primary); }
+      .csh-status.warn { color: var(--dsw-alias-state-warn-primary); }
       .csh-error { margin-top: 7px; padding: 7px 9px; border: 1px solid var(--dsw-alias-state-error-primary); border-radius: 7px; font-size: 11px; line-height: 1.5; color: var(--dsw-alias-state-error-primary); word-break: break-word; }
       .csh-note { margin-top: 6px; font-size: 11px; line-height: 1.5; color: var(--dsw-alias-label-secondary); }
       .csh-switch { position: relative; width: 38px; height: 22px; flex: none; padding: 0; border: 1px solid var(--dsw-alias-border-l2); border-radius: 999px; background: var(--dsw-alias-bg-layer-3); cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease; }
@@ -396,6 +411,7 @@ window.__ModuleLoader__.load({
     }
 
     function statusInfo(item) {
+      if (item.shadowedBy) return { className: 'warn', label: tr('shadowed') }
       switch (item.status) {
         case 'ready': return { className: 'ready', label: `${tr('statusReady')} · ${item.toolCount} ${tr('tools')}` }
         case 'connecting': return { className: 'connecting', label: tr('statusConnecting') }
@@ -512,17 +528,20 @@ window.__ModuleLoader__.load({
 
     function McpRow({ item, busy, confirmDelete, onToggle, onEdit, onDelete, onRetry, onConfirmDelete }) {
       const info = statusInfo(item)
-      return h('div', { className: `csh-row${item.enabled && item.master ? '' : ' is-off'}` },
+      const shadowed = typeof item.shadowedBy === 'string'
+      return h('div', { className: `csh-row${!shadowed && item.enabled && item.master ? '' : ' is-off'}` },
         h('div', { className: 'csh-main' },
           h('div', { className: 'csh-name-line' },
             h('span', { className: 'csh-name' }, item.name),
             sourceBadge(item.source),
+            shadowed ? h(Badge, { tone: 'warn' }, tr('shadowed')) : null,
             h(Badge, null, item.transport),
             item.envKeys.length > 0 ? h(Badge, null, `${tr('envKeys')}: ${item.envKeys.join(', ')}`) : null,
             item.headerKeys.length > 0 ? h(Badge, null, `${tr('headerKeys')}: ${item.headerKeys.join(', ')}`) : null,
           ),
           h('div', { className: 'csh-desc' }, item.summary),
           h('div', { className: 'csh-meta' }, h('span', { className: 'csh-code' }, `mcp__${item.serverName}__`)),
+          shadowed ? h('div', { className: 'csh-note' }, `${tr('shadowedBy')} ${item.shadowedBy}`) : null,
           item.error && item.status === 'error' ? h('div', { className: 'csh-error' }, item.error) : null,
         ),
         h('div', { className: 'csh-side' },
@@ -541,7 +560,8 @@ window.__ModuleLoader__.load({
             h(Switch, {
               checked: item.enabled,
               busy,
-              title: item.enabled ? tr('enabled') : tr('disabled'),
+              disabled: shadowed,
+              title: shadowed ? tr('shadowedBy') : (item.enabled ? tr('enabled') : tr('disabled')),
               onChange: (next) => onToggle(item, next),
             }),
           ),
@@ -827,6 +847,7 @@ window.__ModuleLoader__.load({
       }
 
       const mcpItems = snapshot.mcp.items
+      const harnessMcp = snapshot.mcp.harness ?? []
       const skillItems = snapshot.skills.items
       const needle = query.trim().toLowerCase()
       const filteredMcp = needle === '' ? mcpItems : mcpItems.filter((item) => `${item.name} ${item.summary}`.toLowerCase().includes(needle))
@@ -934,6 +955,24 @@ window.__ModuleLoader__.load({
               onCancel: () => setEditor(null),
             }) : null,
             h('div', { className: 'csh-note' }, tr('namespaceHint')),
+            harnessMcp.length > 0 ? h('div', { className: 'csh-section' },
+              h('div', { className: 'csh-section-head' },
+                h('h3', { className: 'csh-section-title' }, tr('harnessMcpTitle')),
+                h('span', { className: 'csh-master-note' }, tr('harnessMcpDesc')),
+              ),
+              h('div', { className: 'csh-list' }, harnessMcp.map((server) => h('div', { key: server.serverName, className: 'csh-row' },
+                h('div', { className: 'csh-main' },
+                  h('div', { className: 'csh-name-line' },
+                    h('span', { className: 'csh-name' }, server.serverName),
+                    h(Badge, { tone: 'info' }, tr('harnessMcpBadge')),
+                    server.toolCount > 0 ? h(Badge, null, `${server.toolCount} ${tr('tools')}`) : null,
+                  ),
+                ),
+                h('div', { className: 'csh-side' },
+                  h('span', { className: 'csh-status ready' }, h('span', { className: 'csh-dot' }), server.toolCount > 0 ? tr('statusReady') : tr('configured')),
+                ),
+              ))),
+            ) : null,
             h('div', { className: 'csh-list' },
               filteredMcp.length === 0
                 ? h(EmptyState, { searching: needle !== '', title: tr('emptyMcp'), hint: tr('emptyMcpHint') })
@@ -1006,7 +1045,8 @@ window.__ModuleLoader__.load({
                             h(Badge, null, item.transport),
                             item.unsupported ? h(Badge, { tone: 'warn' }, tr('importUnsupported')) : null,
                             item.imported ? h(Badge, { tone: 'ok' }, tr('imported')) : null,
-                            item.conflict ? h(Badge, { tone: 'warn' }, tr('importConflict')) : null,
+                            item.external ? h(Badge, { tone: 'warn' }, tr('harnessMcpImport')) : null,
+                            item.conflict && !item.external ? h(Badge, { tone: 'warn' }, tr('importConflict')) : null,
                           ),
                           h('div', { className: 'csh-desc' }, item.description || item.summary),
                           h('div', { className: 'csh-meta' }, h('span', { className: 'csh-code' }, item.summary)),
@@ -1017,7 +1057,7 @@ window.__ModuleLoader__.load({
                             className: 'csh-btn small',
                             disabled: busy === `import:${item.id}` || item.imported || item.conflict || Boolean(item.unsupported),
                             onClick: () => void importOne('mcp', item.id),
-                          }, item.imported ? tr('imported') : tr('importOne')),
+                          }, item.imported ? tr('imported') : item.external ? tr('harnessMcpImport') : tr('importOne')),
                         ),
                       ))),
                   h('div', { className: 'csh-note' }, tr('importNote')),

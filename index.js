@@ -9,7 +9,7 @@ import crypto from 'node:crypto'
 import os from 'node:os'
 import path from 'node:path'
 import { scanCcSwitch } from './lib/ccswitch.js'
-import { McpRuntime, runtimeServerName, summarizeMcp } from './lib/mcp.js'
+import { McpRuntime, listMcpToolServers, runtimeServerName, summarizeMcp } from './lib/mcp.js'
 import { deleteSkill, importSkill, scanSkills, setSkillEnabled } from './lib/native-skills.js'
 import { resolvePaths, stringValue } from './lib/paths.js'
 import { defaultState, loadState, saveState, setCcSwitchDir } from './lib/state.js'
@@ -94,8 +94,9 @@ function mergeSecrets(next, previous) {
   return merged
 }
 
-function publicMcpItem(item, status, master) {
+function publicMcpItem(item, status, master, shadowedBy) {
   const runtimeName = runtimeServerName(item.id, item.name)
+  const shadowed = typeof shadowedBy === 'string' && shadowedBy !== ''
   return {
     id: item.id,
     name: item.name,
@@ -104,15 +105,16 @@ function publicMcpItem(item, status, master) {
     runtimeName,
     enabled: item.enabled === true,
     master,
-    status: status.status,
-    toolCount: status.toolCount ?? 0,
-    error: status.error,
+    status: shadowed ? 'off' : status.status,
+    toolCount: shadowed ? 0 : (status.toolCount ?? 0),
+    error: shadowed ? undefined : status.error,
     serverName: status.serverName ?? runtimeName,
     envKeys: Object.keys(item.env ?? {}),
     headerKeys: Object.keys(item.headers ?? {}),
     source: item.source,
     updatedAt: item.updatedAt,
-    pending: item.enabled === true && master && status.status === 'off',
+    shadowedBy: shadowed ? shadowedBy : undefined,
+    pending: !shadowed && item.enabled === true && master && status.status === 'off',
   }
 }
 
@@ -193,10 +195,101 @@ export function apply(ctx, rawConfig) {
     }
   }
 
+  function ownRuntimeNames() {
+    return new Set(Object.values(state.mcp.items).map((item) => runtimeServerName(item.id, item.name).toLowerCase()))
+  }
+
+  /** Discover MCP servers owned by Harness itself, without exposing their configs or secrets. */
+  function harnessMcpServers() {
+    const own = ownRuntimeNames()
+    const servers = new Map()
+    const add = (serverName, toolCount, source) => {
+      if (typeof serverName !== 'string' || serverName === '') return
+      if (own.has(serverName.toLowerCase())) return
+      const current = servers.get(serverName.toLowerCase())
+      if (current === undefined) {
+        servers.set(serverName.toLowerCase(), { serverName, toolCount, source })
+        return
+      }
+      current.toolCount = Math.max(current.toolCount, toolCount)
+      if (current.toolCount > 0) current.source = 'tools'
+    }
+    const toolServices = []
+    try {
+      const rootTools = ctx.get?.('tools')
+      if (rootTools !== undefined) toolServices.push(rootTools)
+    } catch {
+      // Root tool discovery is best effort.
+    }
+    try {
+      for (const agent of ctx.get?.('agents')?.list?.() ?? []) {
+        try {
+          const scoped = agent?.ctx?.get?.('tools')
+          if (scoped !== undefined) toolServices.push(scoped)
+        } catch {
+          // An agent may be tearing down.
+        }
+      }
+    } catch {
+      // Agent discovery is best effort.
+    }
+    for (const service of toolServices) {
+      try {
+        const schemas = service.schemas?.() ?? []
+        for (const server of listMcpToolServers(schemas, [...own])) add(server.serverName, server.toolCount, 'tools')
+      } catch {
+        // Tool discovery is best effort.
+      }
+    }
+    const entrySources = []
+    try {
+      if (ctx.loader !== undefined) entrySources.push(ctx.loader)
+    } catch {
+      // Optional loader access.
+    }
+    for (const serviceName of ['loader', 'configEditor']) {
+      try {
+        const service = ctx.get?.(serviceName)
+        if (service !== undefined) entrySources.push(service)
+      } catch {
+        // Optional service access.
+      }
+    }
+    for (const service of entrySources) {
+      try {
+        if (typeof service.entries !== 'function') continue
+        for (const entry of service.entries()) {
+          try {
+            const moduleName = entry?.options?.name
+            const namespace = entry?.moduleNamespace?.name
+            if (moduleName !== '@deepseek-ai/dsh-mcp-client'
+              && moduleName !== 'mcp-client'
+              && namespace !== 'mcp-client') continue
+            if (entry.disabled === true) continue
+            const config = entry.options?.config
+            const serverName = stringValue(config?.serverName)
+            if (serverName !== undefined) add(serverName, 0, 'loader')
+          } catch {
+            // A broken entry must not break the panel.
+          }
+        }
+      } catch {
+        // Loader discovery is best effort.
+      }
+    }
+    return [...servers.values()].sort((left, right) => left.serverName.localeCompare(right.serverName))
+  }
+
+  function shadowedBy(item, harnessNames) {
+    return harnessNames.get(item.name.toLowerCase())
+      ?? harnessNames.get(runtimeServerName(item.id, item.name).toLowerCase())
+  }
+
   function enabledRows() {
     if (state.mcp.master !== true) return []
+    const harnessNames = new Map(harnessMcpServers().map((server) => [server.serverName.toLowerCase(), server.serverName]))
     return Object.values(state.mcp.items)
-      .filter((item) => item.enabled === true)
+      .filter((item) => item.enabled === true && shadowedBy(item, harnessNames) === undefined)
       .map((item) => runtimeRow(item))
   }
 
@@ -211,8 +304,10 @@ export function apply(ctx, rawConfig) {
   function statePayload() {
     const resolved = paths()
     const master = state.mcp.master === true
+    const harness = harnessMcpServers()
+    const harnessNames = new Map(harness.map((server) => [server.serverName.toLowerCase(), server.serverName]))
     const items = Object.values(state.mcp.items)
-      .map((item) => publicMcpItem(item, runtime.statusOf(item.id), master))
+      .map((item) => publicMcpItem(item, runtime.statusOf(item.id), master, shadowedBy(item, harnessNames)))
       .sort((left, right) => left.name.localeCompare(right.name))
     const skills = nativeSkillItems()
     return {
@@ -227,7 +322,7 @@ export function apply(ctx, rawConfig) {
         ccSwitchDir: resolved.ccSwitchDir,
         ccSwitchDb: resolved.ccSwitchDb,
       },
-      mcp: { master, items },
+      mcp: { master, items, harness },
       skills: { items: skills.items },
       warnings: [...new Set([...warnings, ...skills.warnings])],
     }
@@ -329,6 +424,8 @@ export function apply(ctx, rawConfig) {
 
   function ccSwitchPayload(scanned) {
     const nativeNames = new Set(Object.values(state.mcp.items).map((item) => item.name.toLowerCase()))
+    const harness = harnessMcpServers()
+    const harnessNames = new Set(harness.map((server) => server.serverName.toLowerCase()))
     const importedIds = new Set(
       Object.values(state.mcp.items)
         .map((item) => (item.source?.type === 'ccswitch' ? item.source.id : undefined))
@@ -358,7 +455,9 @@ export function apply(ctx, rawConfig) {
         headerKeys: server.headerKeys,
         unsupported: server.unsupported,
         imported: importedIds.has(server.id),
-        conflict: !importedIds.has(server.id) && nativeNames.has(server.name.toLowerCase()),
+        external: !importedIds.has(server.id) && harnessNames.has(server.name.toLowerCase()),
+        conflict: !importedIds.has(server.id)
+          && (harnessNames.has(server.name.toLowerCase()) || nativeNames.has(server.name.toLowerCase())),
       })),
       skills: scanned.skills.items.map((item) => ({
         name: item.name,
@@ -373,6 +472,9 @@ export function apply(ctx, rawConfig) {
   function importMcp(server) {
     if (server.unsupported !== undefined) throw new Error(server.unsupported)
     if (nameConflict(server.name)) throw new Error(`已存在同名 MCP 服务器：${server.name}`)
+    if (harnessMcpServers().some((entry) => entry.serverName.toLowerCase() === server.name.toLowerCase())) {
+      throw new Error(`Harness 已有同名 MCP：${server.name}`)
+    }
     const id = `mcp-${crypto.randomUUID().slice(0, 8)}`
     const now = Date.now()
     const base = {
@@ -424,8 +526,16 @@ export function apply(ctx, rawConfig) {
     logger?.warn?.(`[ccswitch-hub] startup reconcile failed: ${errorMessage(error)}`)
   })
 
+  const discoveryTimers = [1500, 5000].map((delay) => setTimeout(() => {
+    reconcile().catch((error) => {
+      logger?.warn?.(`[ccswitch-hub] discovery reconcile failed: ${errorMessage(error)}`)
+    })
+  }, delay))
+  for (const timer of discoveryTimers) timer.unref?.()
+
   ctx.effect(() => {
     return async () => {
+      for (const timer of discoveryTimers) clearTimeout(timer)
       await runtime.disposeAll()
     }
   }, 'ccswitch-hub: runtime')
@@ -675,6 +785,9 @@ export function apply(ctx, rawConfig) {
       if (item === undefined) throw new Error('找不到该 MCP 服务器')
       if (!state.mcp.master) throw new Error('MCP 总开关已关闭')
       if (!item.enabled) throw new Error('请先启用该服务器')
+      const harnessNames = new Map(harnessMcpServers().map((server) => [server.serverName.toLowerCase(), server.serverName]))
+      const shadow = shadowedBy(item, harnessNames)
+      if (shadow !== undefined) throw new Error(`Harness 已有同名 MCP（${shadow}），已跳过该重复条目`)
       await runtime.retry(runtimeRow(item))
       sendJson(res, 200, statePayload())
     } catch (error) {

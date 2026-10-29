@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parseKeyValueLines } from '../index.js'
-import { runtimeServerName, summarizeMcp, toMcpClientConfig } from '../lib/mcp.js'
+import { listMcpToolServers, runtimeServerName, summarizeMcp, toMcpClientConfig } from '../lib/mcp.js'
 
 test('runtime names are namespaced, grammar-safe, and stable', () => {
   const github = runtimeServerName('id-1', 'GitHub')
@@ -13,6 +13,17 @@ test('runtime names are namespaced, grammar-safe, and stable', () => {
   assert.ok(first.length <= 32)
   assert.notEqual(first, runtimeServerName('id-3', 'My Server / v2'))
   assert.match(runtimeServerName('id-4', '数据库 / DB'), /^csh-(mcp|db)-[a-f0-9]{6}$/)
+})
+
+test('discovers Harness MCP servers from the tool registry', () => {
+  const servers = listMcpToolServers([
+    { name: 'mcp__dbx__query' },
+    { name: 'mcp__dbx__list' },
+    { name: 'mcp__csh-github-abc123__search' },
+    { name: 'read' },
+  ], ['CSH-GITHUB-ABC123'])
+  assert.deepEqual(servers, [{ serverName: 'dbx', toolCount: 2 }])
+  assert.deepEqual(listMcpToolServers([{ name: 'mcp__one__a' }, { name: 'filtered' }], ['one']), [])
 })
 
 test('summaries never include arguments or URL queries', () => {

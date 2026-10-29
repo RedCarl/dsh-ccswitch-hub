@@ -47,6 +47,7 @@ function snapshot(overrides = {}) {
     },
     mcp: {
       master: true,
+      harness: [],
       items: [{
         id: 'mcp-1',
         name: 'GitHub',
@@ -223,6 +224,18 @@ test('renders the update banner and update errors', () => {
   const error = JSON.stringify(renderTree(loadClient(makeReact(failed)).main()))
   assert.match(error, /updateFailed/)
   assert.match(error, /network down/)
+})
+
+test('renders existing Harness MCPs and shadowed duplicates', () => {
+  const state = baseState('mcp')
+  const managed = snapshot()
+  managed.mcp.harness = [{ serverName: 'dbx', toolCount: 4, source: 'tools' }]
+  managed.mcp.items = [{ ...managed.mcp.items[0], name: 'dbx', shadowedBy: 'dbx', status: 'off', pending: false }]
+  state[0] = managed
+  const text = JSON.stringify(renderTree(loadClient(makeReact(state)).main()))
+  assert.match(text, /harnessMcpTitle/)
+  assert.match(text, /dbx/)
+  assert.match(text, /shadowedBy/)
 })
 
 test('renders a pending restart without offering the same update again', () => {
