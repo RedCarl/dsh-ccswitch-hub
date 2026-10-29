@@ -52,13 +52,13 @@ function snapshot(overrides = {}) {
         name: 'GitHub',
         transport: 'stdio',
         summary: 'stdio · npx · 2 args',
-        runtimeName: 'github',
+        runtimeName: 'csh-github-abc123',
         enabled: true,
         master: true,
         status: 'ready',
         toolCount: 3,
         error: undefined,
-        serverName: 'github',
+        serverName: 'csh-github-abc123',
         envKeys: ['GITHUB_TOKEN'],
         headerKeys: [],
         source: null,
@@ -172,7 +172,7 @@ test('renders the native MCP tab and CSS', () => {
   const text = JSON.stringify(rendered)
   assert.match(text, /csh-page/)
   assert.match(text, /GitHub/)
-  assert.match(text, /mcp__github__/)
+  assert.match(text, /mcp__csh-github-abc123__/)
   assert.ok(text.includes('csh-btn.primary { background: var(--dsw-alias-button-primary-fill)'))
   assert.ok(text.includes('csh-switch[aria-checked'))
   assert.equal(text.includes('color: #fff'), false)

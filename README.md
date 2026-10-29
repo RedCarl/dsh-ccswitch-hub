@@ -46,7 +46,7 @@ dsh plugin --profile web add https://github.com/RedCarl/dsh-ccswitch-hub
 
 - **新增 / 编辑 / 删除**：配置名称、传输方式（stdio 或 HTTP）、命令、参数、环境变量、工作目录或 URL、请求头、调用超时。
 - **总开关 + 逐项开关**：关闭总开关会断开所有 MCP，但保留每个服务器的启用选择。
-- 启用的服务器通过 DSH 自带的 `@deepseek-ai/dsh-mcp-client` 动态挂载，工具名形如 `mcp__<server>__<tool>`。
+- 启用的服务器通过 DSH 自带的 `@deepseek-ai/dsh-mcp-client` 动态挂载；运行时 serverName 使用 `csh-<名称>-<短哈希>`，工具名形如 `mcp__csh-...__<tool>`，避免与 `cordis.yml` 里已有的 MCP 冲突。
 - 支持连接失败重试；状态、工具数量、错误会直接显示在行内。
 - 环境变量/请求头的值只保存在 Host（`state.json`，权限 `0600`），列表和编辑接口不会回显已保存的值；编辑时留空表示保留，删除整行表示移除。
 
@@ -100,6 +100,6 @@ node --test
 推送 `v*` 标签会触发 GitHub Actions：`npm pack` 生成 `.tgz` 并上传到对应的 GitHub Release。发布新版本时先更新 `package.json` 的 `version`，提交后：
 
 ```bash
-git tag v2.1.3
-git push origin v2.1.3
+git tag v2.1.4
+git push origin v2.1.4
 ```

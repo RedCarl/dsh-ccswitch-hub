@@ -3,13 +3,16 @@ import test from 'node:test'
 import { parseKeyValueLines } from '../index.js'
 import { runtimeServerName, summarizeMcp, toMcpClientConfig } from '../lib/mcp.js'
 
-test('runtime names are grammar-safe and stable', () => {
-  assert.equal(runtimeServerName('id-1', 'GitHub'), 'GitHub')
+test('runtime names are namespaced, grammar-safe, and stable', () => {
+  const github = runtimeServerName('id-1', 'GitHub')
+  assert.match(github, /^csh-github-[a-f0-9]{6}$/)
   const first = runtimeServerName('id-2', 'My Server / v2')
   const second = runtimeServerName('id-2', 'My Server / v2')
   assert.equal(first, second)
-  assert.match(first, /^[A-Za-z0-9_-]{1,32}$/)
+  assert.match(first, /^csh-my-server-v2-[a-f0-9]{6}$/)
+  assert.ok(first.length <= 32)
   assert.notEqual(first, runtimeServerName('id-3', 'My Server / v2'))
+  assert.match(runtimeServerName('id-4', '数据库 / DB'), /^csh-(mcp|db)-[a-f0-9]{6}$/)
 })
 
 test('summaries never include arguments or URL queries', () => {

@@ -114,6 +114,7 @@ window.__ModuleLoader__.load({
       updateUnsupported: '当前 Host 不支持一键更新，请在终端手动安装。',
       restartRequired: '需要重启 Harness',
       restartHint: '更新包已安装，重启 Harness 后生效。',
+      namespaceHint: '插件管理的 MCP 使用 csh- 前缀 + 短哈希作为运行时 serverName，避免与 cordis.yml 中已有的 MCP 冲突。',
       installedVersion: '已安装',
       warnings: '提示',
       loadFailed: '无法读取状态',
@@ -228,6 +229,7 @@ window.__ModuleLoader__.load({
       updateUnsupported: 'This Host cannot install updates; run the command in a terminal.',
       restartRequired: 'Restart required',
       restartHint: 'The update is installed; restart Harness to use it.',
+      namespaceHint: 'Plugin-managed MCP servers use a csh- prefix and short hash as their runtime serverName, avoiding collisions with MCPs already in cordis.yml.',
       installedVersion: 'Installed',
       warnings: 'Notes',
       loadFailed: 'Could not read status',
@@ -931,6 +933,7 @@ window.__ModuleLoader__.load({
               onSave: (form) => void saveMcp(form),
               onCancel: () => setEditor(null),
             }) : null,
+            h('div', { className: 'csh-note' }, tr('namespaceHint')),
             h('div', { className: 'csh-list' },
               filteredMcp.length === 0
                 ? h(EmptyState, { searching: needle !== '', title: tr('emptyMcp'), hint: tr('emptyMcpHint') })
