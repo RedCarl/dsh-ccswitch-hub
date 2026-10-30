@@ -38,13 +38,13 @@ dsh plugin --profile web add @local/dsh-ccswitch-hub@latest
 
 ## 打开方式
 
-安装后刷新 Web 页面，点击左侧栏的 **MCP 技能** 图标。页面有三个标签：
+安装后刷新 Web 页面，点击左侧栏的 **MCP 技能** 图标。页面有四个标签：
 
 ### MCP 服务器
 
 - **统一列表**：Harness 已有、插件新增和 CC Switch 导入的 MCP 显示在同一张列表里，用 `Harness` / `插件` / `CC Switch` 小标签区分来源。
 - **新增 / 编辑 / 删除**：配置名称、传输方式（stdio 或 HTTP）、命令、参数、环境变量、工作目录或 URL、请求头、调用超时。Harness profile 条目可以直接启停和编辑；插件新增/导入条目支持删除；预设或工具注册表发现的条目只读。
-- **逐项开关**：每个 MCP 独立启停；插件内置 MCP 的总开关移到「高级 / 路径」，不影响 Harness 已有条目。
+- **逐项开关**：每个 MCP 独立启停；插件内置 MCP 的总开关移到「高级」标签，不影响 Harness 已有条目。
 - 启用的服务器通过 DSH 自带的 `@deepseek-ai/dsh-mcp-client` 动态挂载；运行时 serverName 使用 `csh-<名称>-<短哈希>`，工具名形如 `mcp__csh-...__<tool>`，避免与 `cordis.yml` 里已有的 MCP 冲突。
 - 面板会识别由 profile 配置、agent 预设或当前工具注册表启动的 MCP，并把它们并入同一个 MCP 列表。profile 条目可直接启停、编辑（写入 `cordis.patch.yml`）；同名导入条目会标记为「已跳过」，不会重复启动。
 - 支持连接失败重试；状态、工具数量、错误会直接显示在行内。
@@ -103,6 +103,6 @@ node --test
 推送 `v*` 标签会触发 GitHub Actions：`npm pack` 生成 `.tgz` 并上传到对应的 GitHub Release。发布新版本时先更新 `package.json` 的 `version`，提交后：
 
 ```bash
-git tag v2.1.7
-git push origin v2.1.7
+git tag v2.1.8
+git push origin v2.1.8
 ```

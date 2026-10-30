@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-ccswitch-hub",
-  "version": "2.1.7",
+  "version": "2.1.8",
   "type": "module",
   "description": "Native MCP server and skill manager for DeepSeek Harness, with optional CC Switch import.",
   "main": "index.js",

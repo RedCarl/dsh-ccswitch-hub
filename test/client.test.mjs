@@ -194,7 +194,7 @@ test('renders the skills tab and the MCP editor', () => {
   assert.match(editor, /csh-editor/)
 })
 
-test('renders the CC Switch import tab', () => {
+test('renders the CC Switch import tab as scrollable lists', () => {
   const state = baseState('import')
   state[11] = importPayload()
   const { main } = loadClient(makeReact(state))
@@ -202,6 +202,16 @@ test('renders the CC Switch import tab', () => {
   assert.match(text, /Remote tools/)
   assert.match(text, /Beta skill/)
   assert.match(text, /importOne/)
+  assert.match(text, /csh-list csh-scroll/)
+})
+
+test('renders Advanced as its own tab', () => {
+  const state = baseState('advanced')
+  const text = JSON.stringify(renderTree(loadClient(makeReact(state)).main()))
+  assert.match(text, /settingsTitle/)
+  assert.match(text, /ccSwitchDir/)
+  assert.match(text, /skillsDir/)
+  assert.match(text, /stateFile/)
 })
 
 test('renders the update banner and update errors', () => {

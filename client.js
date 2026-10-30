@@ -19,10 +19,13 @@ window.__ModuleLoader__.load({
     const ZH = {
       panelLabel: 'MCP 技能',
       title: 'MCP 与技能',
-      subtitle: '管理 Harness 自己的 MCP 服务器与技能。CC Switch 仅作为导入来源，导入后即成为独立的 Harness 条目。',
+      subtitle: '统一管理 MCP 与技能；CC Switch 仅用于快速导入。',
       tabMcp: 'MCP 服务器',
       tabSkills: '技能',
       tabImport: '从 CC Switch 导入',
+      tabAdvanced: '高级',
+      settingsTitle: '高级 / 路径',
+      versionLabel: '版本',
       refresh: '刷新',
       refreshing: '刷新中…',
       addMcp: '新增 MCP',
@@ -32,7 +35,7 @@ window.__ModuleLoader__.load({
       cancel: '取消',
       save: '保存',
       saving: '保存中…',
-      masterMcp: '插件内置 MCP 总开关',
+      masterMcp: '插件 MCP 总开关',
       masterNote: '只影响通过本插件新增或导入的 MCP。',
       masterOff: '插件内置 MCP 总开关已关闭；可在高级中开启。',
       masterAdvancedNote: '只影响本插件新增/导入的 MCP；Harness 已有 MCP 由各自开关控制。',
@@ -91,7 +94,7 @@ window.__ModuleLoader__.load({
       importRefresh: '重新扫描',
       importNote: '导入的 MCP 默认关闭，导入后请在 MCP 页启用。',
       ccSwitchDir: 'CC Switch 目录（导入来源）',
-      ccSwitchDirHint: '留空使用默认的 ~/.cc-switch；只影响导入，不影响 Harness 自带条目。',
+      ccSwitchDirHint: '留空使用 ~/.cc-switch',
       dbFound: '数据库已找到',
       dbMissing: '数据库未找到',
       skillsFound: '技能目录已找到',
@@ -147,10 +150,13 @@ window.__ModuleLoader__.load({
     const EN = {
       panelLabel: 'MCP Skills',
       title: 'MCP & Skills',
-      subtitle: 'Manage Harness’s own MCP servers and skills. CC Switch is only an import source; imported entries become independent Harness items.',
+      subtitle: 'One place for MCP and skills; CC Switch is only a quick import source.',
       tabMcp: 'MCP servers',
       tabSkills: 'Skills',
       tabImport: 'Import from CC Switch',
+      tabAdvanced: 'Advanced',
+      settingsTitle: 'Advanced / paths',
+      versionLabel: 'Version',
       refresh: 'Refresh',
       refreshing: 'Refreshing…',
       addMcp: 'New MCP',
@@ -160,7 +166,7 @@ window.__ModuleLoader__.load({
       cancel: 'Cancel',
       save: 'Save',
       saving: 'Saving…',
-      masterMcp: 'Plugin-managed MCP master switch',
+      masterMcp: 'Plugin MCP master switch',
       masterNote: 'Only affects MCPs added or imported by this plugin.',
       masterOff: 'The plugin MCP master switch is off; turn it on under Advanced.',
       masterAdvancedNote: 'Only affects plugin-added/imported MCPs; Harness MCPs keep their own switches.',
@@ -219,7 +225,7 @@ window.__ModuleLoader__.load({
       importRefresh: 'Rescan',
       importNote: 'Imported MCP servers start disabled; enable them on the MCP tab.',
       ccSwitchDir: 'CC Switch directory (import source)',
-      ccSwitchDirHint: 'Leave blank for ~/.cc-switch. This only affects imports, not Harness-native entries.',
+      ccSwitchDirHint: 'Leave blank for ~/.cc-switch',
       dbFound: 'Database found',
       dbMissing: 'Database missing',
       skillsFound: 'Skills directory found',
@@ -292,7 +298,6 @@ window.__ModuleLoader__.load({
       .csh-btn.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 10%, transparent); }
       .csh-card { margin-bottom: 14px; padding: 16px 18px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 12px; background: var(--dsw-alias-bg-layer-1); }
       .csh-toolbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
-      .csh-master { display: flex; align-items: center; gap: 10px; min-width: 178px; }
       .csh-master-name { font-size: 13px; font-weight: 550; }
       .csh-master-note { font-size: 11px; color: var(--dsw-alias-label-secondary); }
       .csh-search { flex: 1 1 220px; min-width: 180px; box-sizing: border-box; padding: 8px 11px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); font: inherit; font-size: 13px; }
@@ -354,19 +359,19 @@ window.__ModuleLoader__.load({
       .csh-input { box-sizing: border-box; width: 100%; padding: 8px 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font: inherit; font-size: 12.5px; }
       .csh-input:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 0; border-color: transparent; }
       .csh-textarea { min-height: 72px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.5; }
-      .csh-form-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 14px; }
-      .csh-form-note { margin-right: auto; font-size: 11px; line-height: 1.45; color: var(--dsw-alias-label-secondary); }
       .csh-check-row { display: flex; align-items: center; gap: 10px; min-height: 34px; }
       .csh-section { margin-top: 18px; }
       .csh-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
       .csh-section-title { margin: 0; font-size: 13px; font-weight: 600; }
       .csh-status-card { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
-      .csh-status-path { font-size: 11px; word-break: break-all; color: var(--dsw-alias-label-secondary); }
-      .csh-advanced { margin-top: 16px; }
-      .csh-advanced summary { cursor: pointer; font-size: 13px; color: var(--dsw-alias-label-secondary); user-select: none; }
-      .csh-advanced summary:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; border-radius: 4px; }
-      .csh-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 14px; }
-      .csh-footer { margin-top: 16px; font-size: 11px; line-height: 1.5; color: var(--dsw-alias-label-secondary); word-break: break-all; }
+      .csh-scroll { max-height: 260px; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+      .csh-scroll::-webkit-scrollbar { width: 8px; }
+      .csh-scroll::-webkit-scrollbar-thumb { background: var(--dsw-alias-border-l2); border-radius: 4px; }
+      .csh-settings { display: flex; flex-direction: column; gap: 14px; }
+      .csh-setting-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+      .csh-path-row { display: flex; gap: 10px; align-items: baseline; font-size: 11px; line-height: 1.5; color: var(--dsw-alias-label-secondary); word-break: break-all; }
+      .csh-path-row .csh-label { flex: none; min-width: 88px; }
+      .csh-divider { border-top: 1px solid var(--dsw-alias-border-l1); margin: 2px 0; }
       .csh-row-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
       @media (max-width: 720px) {
         .csh-wrap { padding: 20px 16px 56px; }
@@ -375,6 +380,7 @@ window.__ModuleLoader__.load({
         .csh-row { grid-template-columns: minmax(0, 1fr); }
         .csh-side { flex-direction: row; align-items: center; justify-content: space-between; min-width: 0; }
         .csh-side .csh-row-actions { justify-content: flex-end; }
+        .csh-scroll { max-height: 220px; }
       }
     `
 
@@ -1017,6 +1023,7 @@ window.__ModuleLoader__.load({
             h('button', { type: 'button', role: 'tab', 'aria-selected': tab === 'mcp', className: `csh-tab${tab === 'mcp' ? ' active' : ''}`, onClick: () => switchTab('mcp') }, `${tr('tabMcp')} · ${allMcp.length}`),
             h('button', { type: 'button', role: 'tab', 'aria-selected': tab === 'skills', className: `csh-tab${tab === 'skills' ? ' active' : ''}`, onClick: () => switchTab('skills') }, `${tr('tabSkills')} · ${skillItems.length}`),
             h('button', { type: 'button', role: 'tab', 'aria-selected': tab === 'import', className: `csh-tab${tab === 'import' ? ' active' : ''}`, onClick: () => switchTab('import') }, tr('tabImport')),
+            h('button', { type: 'button', role: 'tab', 'aria-selected': tab === 'advanced', className: `csh-tab${tab === 'advanced' ? ' active' : ''}`, onClick: () => switchTab('advanced') }, tr('tabAdvanced')),
           ),
 
           tab === 'mcp' ? h('div', { className: 'csh-card' },
@@ -1074,7 +1081,6 @@ window.__ModuleLoader__.load({
                     onConfirmDelete: (row) => setConfirmSkill(row.name),
                   })),
             ),
-            h('div', { className: 'csh-note' }, tr('deleteTrashNote')),
           ) : null,
 
           tab === 'import' ? h('div', null,
@@ -1082,7 +1088,6 @@ window.__ModuleLoader__.load({
               h('div', { className: 'csh-section-head' },
                 h('div', null,
                   h('h2', { className: 'csh-section-title' }, tr('importTitle')),
-                  h('div', { className: 'csh-master-note', style: { marginTop: 4 } }, tr('importSubtitle')),
                 ),
                 h('button', { type: 'button', className: 'csh-btn small', disabled: importLoading, onClick: () => void loadImport() }, importLoading ? tr('refreshing') : tr('importRefresh')),
               ),
@@ -1091,9 +1096,8 @@ window.__ModuleLoader__.load({
               importPayload === null && !importLoading ? h('div', { className: 'csh-banner warn' }, tr('importHint')) : null,
               importPayload !== null ? h('div', null,
                 h('div', { className: 'csh-status-card' },
-                  h(Badge, { tone: importPayload.status.dbExists ? 'ok' : 'warn' }, `${tr('dbPath')}: ${importPayload.status.dbExists ? tr('dbFound') : tr('dbMissing')}`),
-                  h(Badge, { tone: importPayload.status.skillsExists ? 'ok' : 'warn' }, `${tr('importSkillsTitle')}: ${importPayload.status.skillsExists ? tr('skillsFound') : tr('skillsMissing')}`),
-                  h('span', { className: 'csh-status-path' }, importPayload.status.dir),
+                  h(Badge, { tone: importPayload.status.dbExists ? 'ok' : 'warn' }, importPayload.status.dbExists ? tr('dbFound') : tr('dbMissing')),
+                  h(Badge, { tone: importPayload.status.skillsExists ? 'ok' : 'warn' }, importPayload.status.skillsExists ? tr('skillsFound') : tr('skillsMissing')),
                 ),
                 importPayload.status.mcpError ? h('div', { className: 'csh-error' }, importPayload.status.mcpError) : null,
                 h('div', { className: 'csh-section' },
@@ -1103,7 +1107,7 @@ window.__ModuleLoader__.load({
                   ),
                   importPayload.mcp.length === 0
                     ? h('div', { className: 'csh-note' }, tr('importEmpty'))
-                    : h('div', { className: 'csh-list' }, importPayload.mcp.map((item) => h('div', { key: item.id, className: 'csh-row' },
+                    : h('div', { className: 'csh-list csh-scroll' }, importPayload.mcp.map((item) => h('div', { key: item.id, className: 'csh-row' },
                         h('div', { className: 'csh-main' },
                           h('div', { className: 'csh-name-line' },
                             h('span', { className: 'csh-name' }, item.name),
@@ -1125,7 +1129,6 @@ window.__ModuleLoader__.load({
                           }, item.imported ? tr('imported') : item.external ? tr('harnessMcpImport') : tr('importOne')),
                         ),
                       ))),
-                  h('div', { className: 'csh-note' }, tr('importNote')),
                 ),
                 h('div', { className: 'csh-section' },
                   h('div', { className: 'csh-section-head' },
@@ -1134,7 +1137,7 @@ window.__ModuleLoader__.load({
                   ),
                   importPayload.skills.length === 0
                     ? h('div', { className: 'csh-note' }, tr('importEmpty'))
-                    : h('div', { className: 'csh-list' }, importPayload.skills.map((item) => h('div', { key: item.name, className: 'csh-row' },
+                    : h('div', { className: 'csh-list csh-scroll' }, importPayload.skills.map((item) => h('div', { key: item.name, className: 'csh-row' },
                         h('div', { className: 'csh-main' },
                           h('div', { className: 'csh-name-line' },
                             h('span', { className: 'csh-name' }, item.name),
@@ -1160,42 +1163,42 @@ window.__ModuleLoader__.load({
             ),
           ) : null,
 
-          h('div', { className: 'csh-card' },
-            h('details', { className: 'csh-advanced' },
-              h('summary', null, tr('advanced')),
-              h('div', { className: 'csh-form' },
-                h('div', { className: 'csh-field' },
-                  h('label', { className: 'csh-label' }, tr('masterMcp')),
-                  h('div', { className: 'csh-check-row' },
-                    h(Switch, {
-                      checked: snapshot.mcp.master,
-                      busy: busy === 'master',
-                      title: tr('masterMcp'),
-                      onChange: (enabled) => void act(`${API}/mcp-master`, { enabled }, 'master'),
-                    }),
-                    h('span', { className: 'csh-note', style: { marginTop: 0 } }, tr('masterAdvancedNote')),
-                  ),
-                ),
-                h('div', { className: 'csh-field' },
-                  h('label', { className: 'csh-label' }, tr('ccSwitchDir')),
+          tab === 'advanced' ? h('div', { className: 'csh-card' },
+            h('div', { className: 'csh-section-head' },
+              h('h2', { className: 'csh-section-title' }, tr('settingsTitle')),
+              h('span', { className: 'csh-master-note' }, `${tr('versionLabel')} v${snapshot.pluginVersion ?? ''}`),
+            ),
+            h('div', { className: 'csh-settings' },
+              h('div', { className: 'csh-field' },
+                h('label', { className: 'csh-label' }, tr('ccSwitchDir')),
+                h('div', { className: 'csh-check-row', style: { alignItems: 'stretch' } },
                   h('input', { className: 'csh-input', value: ccSwitchDir, placeholder: snapshot.paths.ccSwitchDir, onChange: (event) => setCcSwitchDir(event.target.value) }),
-                  h('div', { className: 'csh-note' }, tr('ccSwitchDirHint')),
-                ),
-                h('div', { className: 'csh-field wide' },
-                  h('div', { className: 'csh-note' }, tr('namespaceHint')),
-                  h('div', { className: 'csh-note' }, `${tr('skillsDir')}: ${snapshot.paths.skillsDir}`),
-                  h('div', { className: 'csh-note' }, `${tr('disabledDir')}: ${snapshot.paths.disabledSkillsDir}`),
-                  h('div', { className: 'csh-note' }, `${tr('dbPath')}: ${snapshot.paths.ccSwitchDb}`),
-                ),
-                h('div', { className: 'csh-form-actions' },
-                  h('span', { className: 'csh-form-note' }, configNote),
                   h('button', { type: 'button', className: 'csh-btn primary small', disabled: busy === 'config', onClick: () => void saveConfig() }, busy === 'config' ? tr('saving') : tr('saveConfig')),
                 ),
+                h('div', { className: 'csh-note' }, tr('ccSwitchDirHint')),
+                configNote !== '' ? h('div', { className: 'csh-note' }, configNote) : null,
+              ),
+              h('div', { className: 'csh-divider' }),
+              h('div', { className: 'csh-setting-row' },
+                h('div', { className: 'csh-master-name' }, tr('masterMcp')),
+                h(Switch, {
+                  checked: snapshot.mcp.master,
+                  busy: busy === 'master',
+                  title: tr('masterMcp'),
+                  onChange: (enabled) => void act(`${API}/mcp-master`, { enabled }, 'master'),
+                }),
+              ),
+              h('div', { className: 'csh-divider' }),
+              h('div', { className: 'csh-path-row' },
+                h('span', { className: 'csh-label' }, tr('skillsDir')),
+                h('span', { className: 'csh-code' }, snapshot.paths.skillsDir),
+              ),
+              h('div', { className: 'csh-path-row' },
+                h('span', { className: 'csh-label' }, tr('stateFile')),
+                h('span', { className: 'csh-code' }, snapshot.stateFile),
               ),
             ),
-          ),
-
-          h('div', { className: 'csh-footer' }, `${tr('stateFile')}: ${snapshot.stateFile} · v${snapshot.pluginVersion ?? ''}`),
+          ) : null,
         ),
       )
     }
