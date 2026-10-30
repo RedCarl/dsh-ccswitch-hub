@@ -236,7 +236,7 @@ test('renders existing Harness MCPs and shadowed duplicates', () => {
   managed.mcp.items = [{ ...managed.mcp.items[0], name: 'dbx', shadowedBy: 'dbx', status: 'off', pending: false }]
   state[0] = managed
   const text = JSON.stringify(renderTree(loadClient(makeReact(state)).main()))
-  assert.match(text, /harnessMcpTitle/)
+  assert.match(text, /sourceHarness/)
   assert.match(text, /dbx/)
   assert.match(text, /shadowedBy/)
   assert.match(text, /readOnly/)

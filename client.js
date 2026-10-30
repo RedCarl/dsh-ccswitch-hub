@@ -32,9 +32,10 @@ window.__ModuleLoader__.load({
       cancel: '取消',
       save: '保存',
       saving: '保存中…',
-      masterMcp: '启用 MCP',
-      masterNote: '关闭后保留每个服务器的启用选择。',
-      masterOff: 'MCP 总开关已关闭，已启用的服务器不会连接。',
+      masterMcp: '插件内置 MCP 总开关',
+      masterNote: '只影响通过本插件新增或导入的 MCP。',
+      masterOff: '插件内置 MCP 总开关已关闭；可在高级中开启。',
+      masterAdvancedNote: '只影响本插件新增/导入的 MCP；Harness 已有 MCP 由各自开关控制。',
       searchMcp: '搜索 MCP 服务器…',
       searchSkills: '搜索技能…',
       emptyMcp: '还没有 MCP 服务器',
@@ -49,6 +50,9 @@ window.__ModuleLoader__.load({
       pending: '等待连接',
       retry: '重试',
       native: 'Harness',
+      sourcePlugin: '插件',
+      sourceHarness: 'Harness',
+      sourceCcSwitch: 'CC Switch',
       importedFrom: '导入自 CC Switch',
       envKeys: '环境变量',
       headerKeys: '请求头',
@@ -156,9 +160,10 @@ window.__ModuleLoader__.load({
       cancel: 'Cancel',
       save: 'Save',
       saving: 'Saving…',
-      masterMcp: 'Enable MCP',
-      masterNote: 'Turning this off keeps each server’s choice.',
-      masterOff: 'The MCP master switch is off; enabled servers will not connect.',
+      masterMcp: 'Plugin-managed MCP master switch',
+      masterNote: 'Only affects MCPs added or imported by this plugin.',
+      masterOff: 'The plugin MCP master switch is off; turn it on under Advanced.',
+      masterAdvancedNote: 'Only affects plugin-added/imported MCPs; Harness MCPs keep their own switches.',
       searchMcp: 'Search MCP servers…',
       searchSkills: 'Search skills…',
       emptyMcp: 'No MCP servers yet',
@@ -173,6 +178,9 @@ window.__ModuleLoader__.load({
       pending: 'Waiting to connect',
       retry: 'Retry',
       native: 'Harness',
+      sourcePlugin: 'Plugin',
+      sourceHarness: 'Harness',
+      sourceCcSwitch: 'CC Switch',
       importedFrom: 'From CC Switch',
       envKeys: 'Environment keys',
       headerKeys: 'Header keys',
@@ -416,17 +424,20 @@ window.__ModuleLoader__.load({
 
     function statusInfo(item) {
       if (item.shadowedBy) return { className: 'warn', label: tr('shadowed') }
+      if (item.enabled !== true) return { className: 'warn', label: tr('disabled') }
       switch (item.status) {
         case 'ready': return { className: 'ready', label: `${tr('statusReady')} · ${item.toolCount} ${tr('tools')}` }
         case 'connecting': return { className: 'connecting', label: tr('statusConnecting') }
         case 'error': return { className: 'error', label: tr('statusError') }
+        case 'configured': return { className: '', label: tr('configured') }
         default: return { className: '', label: item.pending ? tr('pending') : tr('statusOff') }
       }
     }
 
     function sourceBadge(source) {
-      if (source?.type === 'ccswitch') return h(Badge, { tone: 'info' }, tr('importedFrom'))
-      return h(Badge, null, tr('native'))
+      if (source?.type === 'ccswitch') return h(Badge, null, tr('sourceCcSwitch'))
+      if (source?.type === 'harness') return h(Badge, { tone: 'info' }, tr('sourceHarness'))
+      return h(Badge, null, tr('sourcePlugin'))
     }
 
     function McpEditor({ detail, busy, external, onSave, onCancel }) {
@@ -531,45 +542,78 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function McpRow({ item, busy, confirmDelete, onToggle, onEdit, onDelete, onRetry, onConfirmDelete }) {
+    function McpRow({
+      item,
+      busy,
+      confirmDelete,
+      onToggle,
+      onEdit,
+      onDelete,
+      onRetry,
+      onConfirmDelete,
+      onToggleHarness,
+      onEditHarness,
+    }) {
+      const external = item.kind === 'harness'
+      const shadowed = !external && typeof item.shadowedBy === 'string'
       const info = statusInfo(item)
-      const shadowed = typeof item.shadowedBy === 'string'
-      return h('div', { className: `csh-row${!shadowed && item.enabled && item.master ? '' : ' is-off'}` },
+      const envKeys = Array.isArray(item.envKeys) ? item.envKeys : []
+      const headerKeys = Array.isArray(item.headerKeys) ? item.headerKeys : []
+      const active = external ? item.enabled === true : item.enabled === true && item.master !== false && !shadowed
+      return h('div', { className: `csh-row${active ? '' : ' is-off'}` },
         h('div', { className: 'csh-main' },
           h('div', { className: 'csh-name-line' },
             h('span', { className: 'csh-name' }, item.name),
             sourceBadge(item.source),
+            item.transport !== undefined && item.transport !== 'unknown' ? h(Badge, null, item.transport) : null,
             shadowed ? h(Badge, { tone: 'warn' }, tr('shadowed')) : null,
-            h(Badge, null, item.transport),
-            item.envKeys.length > 0 ? h(Badge, null, `${tr('envKeys')}: ${item.envKeys.join(', ')}`) : null,
-            item.headerKeys.length > 0 ? h(Badge, null, `${tr('headerKeys')}: ${item.headerKeys.join(', ')}`) : null,
           ),
-          h('div', { className: 'csh-desc' }, item.summary),
-          h('div', { className: 'csh-meta' }, h('span', { className: 'csh-code' }, `mcp__${item.serverName}__`)),
+          item.kind !== 'harness' && item.summary ? h('div', { className: 'csh-desc' }, item.summary) : null,
+          h('div', { className: 'csh-meta' },
+            h('span', { className: 'csh-code' }, `mcp__${item.serverName}__`),
+            envKeys.length > 0 ? h('span', null, `${tr('envKeys')}: ${envKeys.join(', ')}`) : null,
+            headerKeys.length > 0 ? h('span', null, `${tr('headerKeys')}: ${headerKeys.join(', ')}`) : null,
+          ),
           shadowed ? h('div', { className: 'csh-note' }, `${tr('shadowedBy')} ${item.shadowedBy}`) : null,
           item.error && item.status === 'error' ? h('div', { className: 'csh-error' }, item.error) : null,
         ),
         h('div', { className: 'csh-side' },
           h('span', { className: `csh-status ${info.className}` }, h('span', { className: 'csh-dot' }), info.label),
-          h('div', { className: 'csh-row-actions' },
-            item.status === 'error' && item.enabled && item.master
-              ? h('button', { type: 'button', className: 'csh-btn small', disabled: busy, onClick: () => onRetry(item) }, tr('retry'))
-              : null,
-            h('button', { type: 'button', className: 'csh-btn small', disabled: busy, onClick: () => onEdit(item) }, tr('edit')),
-            h('button', {
-              type: 'button',
-              className: 'csh-btn small danger',
-              disabled: busy,
-              onClick: () => (confirmDelete ? onDelete(item) : onConfirmDelete(item)),
-            }, confirmDelete ? tr('confirmDelete') : tr('delete')),
-            h(Switch, {
-              checked: item.enabled,
-              busy,
-              disabled: shadowed,
-              title: shadowed ? tr('shadowedBy') : (item.enabled ? tr('enabled') : tr('disabled')),
-              onChange: (next) => onToggle(item, next),
-            }),
-          ),
+          external
+            ? h('div', { className: 'csh-row-actions' },
+                item.manageable === true
+                  ? h(React.Fragment, null,
+                      item.editable === true
+                        ? h('button', { type: 'button', className: 'csh-btn small', disabled: busy, onClick: () => onEditHarness(item) }, tr('edit'))
+                        : null,
+                      h(Switch, {
+                        checked: item.enabled,
+                        busy,
+                        title: item.enabled ? tr('enabled') : tr('disabled'),
+                        onChange: (next) => onToggleHarness(item, next),
+                      }),
+                    )
+                  : h(Badge, null, tr('readOnly')),
+              )
+            : h('div', { className: 'csh-row-actions' },
+                item.status === 'error' && item.enabled && item.master
+                  ? h('button', { type: 'button', className: 'csh-btn small', disabled: busy, onClick: () => onRetry(item) }, tr('retry'))
+                  : null,
+                h('button', { type: 'button', className: 'csh-btn small', disabled: busy, onClick: () => onEdit(item) }, tr('edit')),
+                h('button', {
+                  type: 'button',
+                  className: 'csh-btn small danger',
+                  disabled: busy,
+                  onClick: () => (confirmDelete ? onDelete(item) : onConfirmDelete(item)),
+                }, confirmDelete ? tr('confirmDelete') : tr('delete')),
+                h(Switch, {
+                  checked: item.enabled,
+                  busy,
+                  disabled: shadowed,
+                  title: shadowed ? tr('shadowedBy') : (item.enabled ? tr('enabled') : tr('disabled')),
+                  onChange: (next) => onToggle(item, next),
+                }),
+              ),
         ),
       )
     }
@@ -869,13 +913,37 @@ window.__ModuleLoader__.load({
           ))
       }
 
-      const mcpItems = snapshot.mcp.items
+      const nativeMcp = snapshot.mcp.items.map((item) => ({ ...item, kind: 'native' }))
       const harnessMcp = snapshot.mcp.harness ?? []
+      const harnessRows = harnessMcp.map((server) => ({
+        kind: 'harness',
+        id: `harness:${server.entryId ?? server.serverName}`,
+        name: server.serverName,
+        transport: server.transport,
+        summary: server.summary,
+        enabled: server.enabled !== false,
+        master: true,
+        status: server.enabled === false ? 'off' : (server.toolCount > 0 ? 'ready' : 'configured'),
+        toolCount: server.toolCount ?? 0,
+        error: undefined,
+        serverName: server.serverName,
+        envKeys: server.envKeys ?? [],
+        headerKeys: server.headerKeys ?? [],
+        source: { type: 'harness', id: server.entryId, name: server.serverName },
+        shadowedBy: undefined,
+        pending: false,
+        entryId: server.entryId,
+        manageable: server.manageable === true,
+        editable: server.editable === true,
+      }))
       const skillItems = snapshot.skills.items
+      const allMcp = [...nativeMcp, ...harnessRows].sort((left, right) => left.name.localeCompare(right.name))
       const needle = query.trim().toLowerCase()
-      const filteredMcp = needle === '' ? mcpItems : mcpItems.filter((item) => `${item.name} ${item.summary}`.toLowerCase().includes(needle))
+      const filteredMcp = needle === ''
+        ? allMcp
+        : allMcp.filter((item) => `${item.name} ${item.summary ?? ''} ${item.serverName}`.toLowerCase().includes(needle))
       const filteredSkills = needle === '' ? skillItems : skillItems.filter((item) => `${item.name} ${item.description}`.toLowerCase().includes(needle))
-      const enabledMcp = mcpItems.filter((item) => item.enabled).length
+      const enabledMcp = allMcp.filter((item) => item.enabled === true && typeof item.shadowedBy !== 'string' && (item.kind === 'harness' || item.master !== false)).length
       const enabledSkills = skillItems.filter((item) => item.enabled).length
       const warnings = snapshot.warnings ?? []
 
@@ -887,7 +955,7 @@ window.__ModuleLoader__.load({
               h('p', { className: 'csh-sub' }, tr('subtitle')),
             ),
             h('div', { className: 'csh-head-actions' },
-              h(Badge, { tone: 'ok' }, `${tr('countMcp')} ${mcpItems.length} · ${tr('countSkills')} ${skillItems.length}`),
+              h(Badge, { tone: 'ok' }, `${tr('countMcp')} ${allMcp.length} · ${tr('countSkills')} ${skillItems.length}`),
               updateInfo?.updateAvailable
                 ? h('button', {
                     type: 'button',
@@ -946,25 +1014,13 @@ window.__ModuleLoader__.load({
           loadError !== '' ? h('div', { className: 'csh-banner warn' }, `${tr('loadFailed')}: ${loadError}`) : null,
 
           h('div', { className: 'csh-tabs', role: 'tablist' },
-            h('button', { type: 'button', role: 'tab', 'aria-selected': tab === 'mcp', className: `csh-tab${tab === 'mcp' ? ' active' : ''}`, onClick: () => switchTab('mcp') }, `${tr('tabMcp')} · ${mcpItems.length}`),
+            h('button', { type: 'button', role: 'tab', 'aria-selected': tab === 'mcp', className: `csh-tab${tab === 'mcp' ? ' active' : ''}`, onClick: () => switchTab('mcp') }, `${tr('tabMcp')} · ${allMcp.length}`),
             h('button', { type: 'button', role: 'tab', 'aria-selected': tab === 'skills', className: `csh-tab${tab === 'skills' ? ' active' : ''}`, onClick: () => switchTab('skills') }, `${tr('tabSkills')} · ${skillItems.length}`),
             h('button', { type: 'button', role: 'tab', 'aria-selected': tab === 'import', className: `csh-tab${tab === 'import' ? ' active' : ''}`, onClick: () => switchTab('import') }, tr('tabImport')),
           ),
 
           tab === 'mcp' ? h('div', { className: 'csh-card' },
             h('div', { className: 'csh-toolbar' },
-              h('div', { className: 'csh-master' },
-                h(Switch, {
-                  checked: snapshot.mcp.master,
-                  busy: busy === 'master',
-                  title: tr('masterMcp'),
-                  onChange: (enabled) => void act(`${API}/mcp-master`, { enabled }, 'master'),
-                }),
-                h('div', null,
-                  h('div', { className: 'csh-master-name' }, tr('masterMcp')),
-                  h('div', { className: 'csh-master-note' }, tr('masterNote')),
-                ),
-              ),
               h('button', { type: 'button', className: 'csh-btn primary', onClick: openNew }, tr('addMcp')),
               h('input', { className: 'csh-search', type: 'search', value: query, placeholder: tr('searchMcp'), 'aria-label': tr('searchMcp'), onChange: (event) => setQuery(event.target.value) }),
               h('span', { className: 'csh-master-note' }, `${enabledMcp} ${tr('enabledCount')}`),
@@ -978,56 +1034,23 @@ window.__ModuleLoader__.load({
               onSave: (form) => void saveMcp(form),
               onCancel: () => setEditor(null),
             }) : null,
-            h('div', { className: 'csh-note' }, tr('namespaceHint')),
-            harnessMcp.length > 0 ? h('div', { className: 'csh-section' },
-              h('div', { className: 'csh-section-head' },
-                h('h3', { className: 'csh-section-title' }, tr('harnessMcpTitle')),
-                h('span', { className: 'csh-master-note' }, tr('harnessMcpDesc')),
-              ),
-              h('div', { className: 'csh-list' }, harnessMcp.map((server) => h('div', { key: server.serverName, className: 'csh-row' },
-                h('div', { className: 'csh-main' },
-                  h('div', { className: 'csh-name-line' },
-                    h('span', { className: 'csh-name' }, server.serverName),
-                    h(Badge, { tone: 'info' }, tr('harnessMcpBadge')),
-                    server.transport !== 'unknown' ? h(Badge, null, server.transport) : null,
-                    server.toolCount > 0 ? h(Badge, null, `${server.toolCount} ${tr('tools')}`) : null,
-                  ),
-                  h('div', { className: 'csh-meta' }, h('span', { className: 'csh-code' }, `mcp__${server.serverName}__`)),
-                ),
-                h('div', { className: 'csh-side' },
-                  h('span', { className: `csh-status ${!server.enabled ? 'warn' : server.toolCount > 0 ? 'ready' : ''}` },
-                    h('span', { className: 'csh-dot' }),
-                    !server.enabled ? tr('disabled') : server.toolCount > 0 ? tr('statusReady') : tr('configured'),
-                  ),
-                  server.manageable === true
-                    ? h('div', { className: 'csh-row-actions' },
-                        server.editable === true
-                          ? h('button', { type: 'button', className: 'csh-btn small', disabled: busy === `harness:${server.entryId}`, onClick: () => void openHarnessEdit(server) }, tr('edit'))
-                          : null,
-                        h(Switch, {
-                          checked: server.enabled,
-                          busy: busy === `harness:${server.entryId}`,
-                          title: server.enabled ? tr('enabled') : tr('disabled'),
-                          onChange: (next) => toggleHarnessMcp(server, next),
-                        }),
-                      )
-                    : h(Badge, null, tr('readOnly')),
-                ),
-              ))),
-            ) : null,
             h('div', { className: 'csh-list' },
               filteredMcp.length === 0
                 ? h(EmptyState, { searching: needle !== '', title: tr('emptyMcp'), hint: tr('emptyMcpHint') })
                 : filteredMcp.map((item) => h(McpRow, {
                     key: item.id,
                     item,
-                    busy: busy === `mcp:${item.id}` || busy === `detail:${item.id}`,
-                    confirmDelete: confirmMcp === item.id,
+                    busy: item.kind === 'harness'
+                      ? busy === `harness:${item.entryId}`
+                      : busy === `mcp:${item.id}` || busy === `detail:${item.id}`,
+                    confirmDelete: item.kind !== 'harness' && confirmMcp === item.id,
                     onToggle: toggleMcp,
                     onEdit: (row) => void openEdit(row),
                     onDelete: (row) => void deleteMcp(row),
                     onRetry: retryMcp,
                     onConfirmDelete: (row) => setConfirmMcp(row.id),
+                    onToggleHarness: toggleHarnessMcp,
+                    onEditHarness: (row) => void openHarnessEdit(row),
                   })),
             ),
           ) : null,
@@ -1142,11 +1165,24 @@ window.__ModuleLoader__.load({
               h('summary', null, tr('advanced')),
               h('div', { className: 'csh-form' },
                 h('div', { className: 'csh-field' },
+                  h('label', { className: 'csh-label' }, tr('masterMcp')),
+                  h('div', { className: 'csh-check-row' },
+                    h(Switch, {
+                      checked: snapshot.mcp.master,
+                      busy: busy === 'master',
+                      title: tr('masterMcp'),
+                      onChange: (enabled) => void act(`${API}/mcp-master`, { enabled }, 'master'),
+                    }),
+                    h('span', { className: 'csh-note', style: { marginTop: 0 } }, tr('masterAdvancedNote')),
+                  ),
+                ),
+                h('div', { className: 'csh-field' },
                   h('label', { className: 'csh-label' }, tr('ccSwitchDir')),
                   h('input', { className: 'csh-input', value: ccSwitchDir, placeholder: snapshot.paths.ccSwitchDir, onChange: (event) => setCcSwitchDir(event.target.value) }),
                   h('div', { className: 'csh-note' }, tr('ccSwitchDirHint')),
                 ),
                 h('div', { className: 'csh-field wide' },
+                  h('div', { className: 'csh-note' }, tr('namespaceHint')),
                   h('div', { className: 'csh-note' }, `${tr('skillsDir')}: ${snapshot.paths.skillsDir}`),
                   h('div', { className: 'csh-note' }, `${tr('disabledDir')}: ${snapshot.paths.disabledSkillsDir}`),
                   h('div', { className: 'csh-note' }, `${tr('dbPath')}: ${snapshot.paths.ccSwitchDb}`),
