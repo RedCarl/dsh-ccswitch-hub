@@ -97,10 +97,12 @@ node --test
 
 ## 发布
 
-现在插件检查更新读取私有源 `npm.carljoy.cn`，GitHub Release 只作为归档。发布新版本时运行
+更新检测和下载只走私有源 `npm.carljoy.cn`，不再使用 GitHub Release。发布新版本时运行
 `node ../dsh-registry/bin/dsh-registry.mjs publish . --bump patch --deploy`，会同时刷新市场索引。
 
-推送 `v*` 标签会触发 GitHub Actions：`npm pack` 生成 `.tgz` 并上传到对应的 GitHub Release。发布新版本时先更新 `package.json` 的 `version`，提交后：
+也可以推送 `v*` 标签，由 GitHub Actions（`.github/workflows/release.yml`）校验 tag/版本、跑测试和
+`test/update-rule.test.mjs` 后，`npm publish` 到私有源；需要在仓库 secrets 里配置 `NPM_TOKEN`
+（`npm.carljoy.cn` 的发布 token）。发布前先更新 `package.json` 的 `version` 并提交：
 
 ```bash
 git tag v2.2.1
