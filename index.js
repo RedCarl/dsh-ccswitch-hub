@@ -6,9 +6,11 @@
  * definition or skill into Harness as an independent native entry.
  */
 import crypto from 'node:crypto'
+import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { scanCcSwitch } from './lib/ccswitch.js'
+import { removeMcpClientRow } from './lib/harness-config.js'
 import { McpRuntime, listMcpToolServers, runtimeServerName, summarizeMcp } from './lib/mcp.js'
 import { deleteSkill, importSkill, scanSkills, setSkillEnabled } from './lib/native-skills.js'
 import { resolvePaths, stringValue } from './lib/paths.js'
@@ -403,6 +405,16 @@ export function apply(ctx, rawConfig) {
       },
       mcp: { master, items, harness },
       skills: { items: skills.items },
+      ccSwitch: {
+        installed: (() => {
+          try {
+            return fs.statSync(resolved.ccSwitchDir).isDirectory()
+          } catch {
+            return false
+          }
+        })(),
+        dir: resolved.ccSwitchDir,
+      },
       warnings: [...new Set([...warnings, ...skills.warnings])],
     }
   }
@@ -837,11 +849,63 @@ export function apply(ctx, rawConfig) {
       if (!manager || typeof manager.setPluginEnabled !== 'function') {
         throw new Error('当前 Host 不支持修改 Harness 配置')
       }
-      const result = await manager.setPluginEnabled(String(entry.id), body.enabled === true)
-      if (result?.application === 'failed') {
+      const rows = await manager.listPlugins()
+      const patchId = typeof entry.options?.id === 'string' ? entry.options.id : undefined
+      const row = rows.find((candidate) => candidate.entryId === String(entry.id)
+        || candidate.entryId === patchId
+        || candidate.patchId === patchId)
+      if (row === undefined) throw new Error('该 MCP 不在 profile 的可管理行中')
+      if (row.readOnlyReason !== undefined) throw new Error(`该 MCP 不可修改：${row.readOnlyReason}`)
+      const enabled = body.enabled === true
+      const result = await manager.setPluginEnabled(row.entryId, enabled)
+      if (result?.application === 'failed' || result?.application === 'cancelled') {
         throw new Error(result.error?.diagnostic ?? result.error?.code ?? '修改 Harness MCP 状态失败')
       }
-      sendJson(res, 200, statePayload())
+      if (result?.application === 'overridden') throw new Error('该 MCP 的开关被更高优先级配置覆盖')
+      const next = statePayload()
+      const current = next.mcp.harness.find((server) => server.entryId === String(row.entryId)
+        || server.serverName === (stringValue(entry.options?.config?.serverName) ?? ''))
+      if (current !== undefined && current.enabled !== enabled) {
+        throw new Error('开关已写入，但被更高优先级的 profile 配置覆盖')
+      }
+      sendJson(res, 200, next)
+    } catch (error) {
+      sendJson(res, 400, { ok: false, error: truncate(errorMessage(error), 800) })
+    }
+  })
+
+  route(`${BASE}/harness-mcp-delete`, async (req, res) => {
+    if (!writeOnly(req, res)) return
+    try {
+      const body = await readJsonBody(req)
+      const entry = findHarnessEntry(body.entryId)
+      if (entry === undefined) throw new Error('找不到该 Harness MCP 条目')
+      const editor = ctx.get?.('configEditor')
+      if (!editor || typeof editor.documentPath !== 'string') throw new Error('当前 Host 不支持编辑 Harness 配置')
+      const patchId = typeof entry.options?.id === 'string' ? entry.options.id : undefined
+      if (patchId === undefined) throw new Error('无法确定该 MCP 的配置行')
+      const source = await fs.promises.readFile(editor.documentPath, 'utf8')
+      const removal = removeMcpClientRow(source, patchId)
+      if (removal.removed !== true) {
+        throw new Error('该 MCP 不在 profile patch 中，无法从面板删除；请编辑对应的 cordis.yml')
+      }
+      await fs.promises.writeFile(editor.documentPath, removal.text, { mode: 0o600 })
+      let reloaded = false
+      let warning
+      const manager = ctx.get?.('pluginManager')
+      try {
+        if (manager && typeof manager.reload === 'function') {
+          await manager.reload([])
+          reloaded = true
+        }
+      } catch (error) {
+        warning = `配置已删除，但重新加载失败：${errorMessage(error)}；请重启 Harness。`
+      }
+      const payload = statePayload()
+      if (payload.mcp.harness.some((server) => server.entryId === String(entry.id))) {
+        warning = '配置已删除，请重启 Harness 使列表更新。'
+      }
+      sendJson(res, 200, { ...payload, deleted: true, reloaded, warning })
     } catch (error) {
       sendJson(res, 400, { ok: false, error: truncate(errorMessage(error), 800) })
     }

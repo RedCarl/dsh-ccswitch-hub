@@ -43,7 +43,7 @@ dsh plugin --profile web add @local/dsh-ccswitch-hub@latest
 ### MCP 服务器
 
 - **统一列表**：Harness 已有、插件新增和 CC Switch 导入的 MCP 显示在同一张列表里，用 `Harness` / `插件` / `CC Switch` 小标签区分来源。
-- **新增 / 编辑 / 删除**：配置名称、传输方式（stdio 或 HTTP）、命令、参数、环境变量、工作目录或 URL、请求头、调用超时。Harness profile 条目可以直接启停和编辑；插件新增/导入条目支持删除；预设或工具注册表发现的条目只读。
+- **新增 / 编辑 / 删除**：配置名称、传输方式（stdio 或 HTTP）、命令、参数、环境变量、工作目录或 URL、请求头、调用超时。Harness profile 条目可以直接启停、编辑和删除（删除会从 `cordis.patch.yml` 移除该行）；插件新增/导入条目支持删除；预设或工具注册表发现的条目只读。
 - **逐项开关**：每个 MCP 独立启停；插件内置 MCP 的总开关移到「高级」标签，不影响 Harness 已有条目。
 - 启用的服务器通过 DSH 自带的 `@deepseek-ai/dsh-mcp-client` 动态挂载；运行时 serverName 使用 `csh-<名称>-<短哈希>`，工具名形如 `mcp__csh-...__<tool>`，避免与 `cordis.yml` 里已有的 MCP 冲突。
 - 面板会识别由 profile 配置、agent 预设或当前工具注册表启动的 MCP，并把它们并入同一个 MCP 列表。profile 条目可直接启停、编辑（写入 `cordis.patch.yml`）；同名导入条目会标记为「已跳过」，不会重复启动。
@@ -58,6 +58,8 @@ dsh plugin --profile web add @local/dsh-ccswitch-hub@latest
 - 共享目录 `~/.agents/skills` 和项目级技能不在此面板管理，仍由 Harness 自身发现。
 
 ### 从 CC Switch 导入
+
+如果找不到 CC Switch 目录，本插件的导入 Tab、技能页导入按钮和 CC Switch 目录设置都会隐藏。
 
 - 只读取 `~/.cc-switch/cc-switch.db` 的 `mcp_servers` 表和 `~/.cc-switch/skills/`。
 - **导入 MCP**：复制为 Harness 的原生 MCP 条目，默认关闭；导入后可以单独编辑、启停、删除，不再依赖 CC Switch。
@@ -105,6 +107,6 @@ node --test
 （`npm.carljoy.cn` 的发布 token）。发布前先更新 `package.json` 的 `version` 并提交：
 
 ```bash
-git tag v2.2.1
-git push origin v2.2.1
+git tag v2.2.2
+git push origin v2.2.2
 ```

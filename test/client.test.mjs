@@ -67,6 +67,7 @@ function snapshot(overrides = {}) {
         pending: false,
       }],
     },
+    ccSwitch: { installed: true, dir: '/home/me/.cc-switch' },
     skills: {
       items: [{
         name: 'alpha',
@@ -268,6 +269,16 @@ test('renders a pending restart without offering the same update again', () => {
   assert.match(text, /restartRequired/)
   assert.match(text, /restartHint/)
   assert.equal(text.includes('updateTo'), false)
+})
+
+test('hides everything CC Switch when its directory is absent', () => {
+  const state = baseState('skills')
+  const hidden = snapshot()
+  hidden.ccSwitch = { installed: false, dir: '/home/me/.cc-switch' }
+  state[0] = hidden
+  const text = JSON.stringify(renderTree(loadClient(makeReact(state)).main()))
+  assert.equal(text.includes('tabImport'), false)
+  assert.equal(text.includes('ccSwitchDir'), false)
 })
 
 test('renders the empty state and the fatal error shell', () => {

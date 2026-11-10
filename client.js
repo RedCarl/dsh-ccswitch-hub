@@ -20,6 +20,7 @@ window.__ModuleLoader__.load({
       panelLabel: 'MCP 技能',
       title: 'MCP 与技能',
       subtitle: '统一管理 MCP 与技能；CC Switch 仅用于快速导入。',
+      subtitleNoCcSwitch: '统一管理 MCP 与技能。',
       tabMcp: 'MCP 服务器',
       tabSkills: '技能',
       tabImport: '从 CC Switch 导入',
@@ -151,6 +152,7 @@ window.__ModuleLoader__.load({
       panelLabel: 'MCP Skills',
       title: 'MCP & Skills',
       subtitle: 'One place for MCP and skills; CC Switch is only a quick import source.',
+      subtitleNoCcSwitch: 'One place for MCP and skills.',
       tabMcp: 'MCP servers',
       tabSkills: 'Skills',
       tabImport: 'Import from CC Switch',
@@ -589,6 +591,12 @@ window.__ModuleLoader__.load({
             ? h('div', { className: 'csh-row-actions' },
                 item.manageable === true
                   ? h(React.Fragment, null,
+                      h('button', {
+                        type: 'button',
+                        className: 'csh-btn small danger',
+                        disabled: busy,
+                        onClick: () => (confirmDelete ? onDelete(item) : onConfirmDelete(item)),
+                      }, confirmDelete ? tr('confirmDelete') : tr('delete')),
                       item.editable === true
                         ? h('button', { type: 'button', className: 'csh-btn small', disabled: busy, onClick: () => onEditHarness(item) }, tr('edit'))
                         : null,
@@ -699,6 +707,9 @@ window.__ModuleLoader__.load({
       const [updateBusy, setUpdateBusy] = React.useState(false)
       const [updateError, setUpdateError] = React.useState('')
       const [updateNote, setUpdateNote] = React.useState('')
+      const [confirmHarness, setConfirmHarness] = React.useState('')
+      const [deletedHarness, setDeletedHarness] = React.useState([])
+      const ccSwitchInstalled = snapshot?.ccSwitch?.installed === true
       const snapshotRef = React.useRef(null)
       const configInit = React.useRef(false)
       const refreshTimer = React.useRef(null)
@@ -738,6 +749,10 @@ window.__ModuleLoader__.load({
       }, [])
 
       React.useEffect(() => { void load() }, [load])
+
+      React.useEffect(() => {
+        if (!ccSwitchInstalled && tab === 'import') setTab('mcp')
+      }, [ccSwitchInstalled, tab])
 
       const loadUpdate = async (force, manual) => {
         setUpdateChecking(true)
@@ -826,11 +841,13 @@ window.__ModuleLoader__.load({
       }
 
       const switchTab = (next) => {
+        if (next === 'import' && !ccSwitchInstalled) return
         setTab(next)
         setQuery('')
         setEditor(null)
         setConfirmMcp('')
         setConfirmSkill('')
+        setConfirmHarness('')
         if (next === 'import' && importPayload === null && !importLoading) void loadImport()
       }
 
@@ -876,6 +893,14 @@ window.__ModuleLoader__.load({
       }
       const retryMcp = (item) => { void act(`${API}/mcp-retry`, { id: item.id }, `mcp:${item.id}`) }
       const toggleSkill = (item, enabled) => { void act(`${API}/skills-toggle`, { name: item.name, enabled }, `skill:${item.name}`) }
+      const deleteHarness = async (item) => {
+        const payload = await act(`${API}/harness-mcp-delete`, { entryId: item.entryId }, `harness:${item.entryId}`)
+        if (payload !== null) {
+          setConfirmHarness('')
+          setDeletedHarness((current) => [...current, item.entryId])
+          setNotice(payload.warning ? `${tr('mcpDeleted')} ${payload.warning}` : tr('mcpDeleted'))
+        }
+      }
       const deleteSkill = async (item) => {
         const payload = await act(`${API}/skills-delete`, { name: item.name }, `skill:${item.name}`)
         if (payload !== null) { setConfirmSkill(''); setNotice(tr('skillDeleted')) }
@@ -921,7 +946,7 @@ window.__ModuleLoader__.load({
 
       const nativeMcp = snapshot.mcp.items.map((item) => ({ ...item, kind: 'native' }))
       const harnessMcp = snapshot.mcp.harness ?? []
-      const harnessRows = harnessMcp.map((server) => ({
+      const harnessRows = harnessMcp.filter((server) => !deletedHarness.includes(server.entryId)).map((server) => ({
         kind: 'harness',
         id: `harness:${server.entryId ?? server.serverName}`,
         name: server.serverName,
@@ -958,7 +983,7 @@ window.__ModuleLoader__.load({
           h('div', { className: 'csh-head' },
             h('div', null,
               h('h1', { className: 'csh-title' }, tr('title')),
-              h('p', { className: 'csh-sub' }, tr('subtitle')),
+              h('p', { className: 'csh-sub' }, ccSwitchInstalled ? tr('subtitle') : tr('subtitleNoCcSwitch')),
             ),
             h('div', { className: 'csh-head-actions' },
               h(Badge, { tone: 'ok' }, `${tr('countMcp')} ${allMcp.length} · ${tr('countSkills')} ${skillItems.length}`),
@@ -1022,7 +1047,7 @@ window.__ModuleLoader__.load({
           h('div', { className: 'csh-tabs', role: 'tablist' },
             h('button', { type: 'button', role: 'tab', 'aria-selected': tab === 'mcp', className: `csh-tab${tab === 'mcp' ? ' active' : ''}`, onClick: () => switchTab('mcp') }, `${tr('tabMcp')} · ${allMcp.length}`),
             h('button', { type: 'button', role: 'tab', 'aria-selected': tab === 'skills', className: `csh-tab${tab === 'skills' ? ' active' : ''}`, onClick: () => switchTab('skills') }, `${tr('tabSkills')} · ${skillItems.length}`),
-            h('button', { type: 'button', role: 'tab', 'aria-selected': tab === 'import', className: `csh-tab${tab === 'import' ? ' active' : ''}`, onClick: () => switchTab('import') }, tr('tabImport')),
+            ccSwitchInstalled ? h('button', { type: 'button', role: 'tab', 'aria-selected': tab === 'import', className: `csh-tab${tab === 'import' ? ' active' : ''}`, onClick: () => switchTab('import') }, tr('tabImport')) : null,
             h('button', { type: 'button', role: 'tab', 'aria-selected': tab === 'advanced', className: `csh-tab${tab === 'advanced' ? ' active' : ''}`, onClick: () => switchTab('advanced') }, tr('tabAdvanced')),
           ),
 
@@ -1050,12 +1075,14 @@ window.__ModuleLoader__.load({
                     busy: item.kind === 'harness'
                       ? busy === `harness:${item.entryId}`
                       : busy === `mcp:${item.id}` || busy === `detail:${item.id}`,
-                    confirmDelete: item.kind !== 'harness' && confirmMcp === item.id,
+                    confirmDelete: item.kind === 'harness' ? confirmHarness === item.entryId : confirmMcp === item.id,
                     onToggle: toggleMcp,
                     onEdit: (row) => void openEdit(row),
-                    onDelete: (row) => void deleteMcp(row),
+                    onDelete: item.kind === 'harness' ? (row) => void deleteHarness(row) : (row) => void deleteMcp(row),
                     onRetry: retryMcp,
-                    onConfirmDelete: (row) => setConfirmMcp(row.id),
+                    onConfirmDelete: item.kind === 'harness'
+                      ? (row) => setConfirmHarness(row.entryId)
+                      : (row) => setConfirmMcp(row.id),
                     onToggleHarness: toggleHarnessMcp,
                     onEditHarness: (row) => void openHarnessEdit(row),
                   })),
@@ -1066,7 +1093,7 @@ window.__ModuleLoader__.load({
             h('div', { className: 'csh-toolbar' },
               h('input', { className: 'csh-search', type: 'search', value: query, placeholder: tr('searchSkills'), 'aria-label': tr('searchSkills'), onChange: (event) => setQuery(event.target.value) }),
               h('span', { className: 'csh-master-note' }, `${enabledSkills} ${tr('enabledCount')}`),
-              h('button', { type: 'button', className: 'csh-btn', onClick: () => switchTab('import') }, tr('tabImport')),
+              ccSwitchInstalled ? h('button', { type: 'button', className: 'csh-btn', onClick: () => switchTab('import') }, tr('tabImport')) : null,
             ),
             h('div', { className: 'csh-list' },
               filteredSkills.length === 0
@@ -1083,7 +1110,7 @@ window.__ModuleLoader__.load({
             ),
           ) : null,
 
-          tab === 'import' ? h('div', null,
+          tab === 'import' && ccSwitchInstalled ? h('div', null,
             h('div', { className: 'csh-card' },
               h('div', { className: 'csh-section-head' },
                 h('div', null,
@@ -1169,7 +1196,7 @@ window.__ModuleLoader__.load({
               h('span', { className: 'csh-master-note' }, `${tr('versionLabel')} v${snapshot.pluginVersion ?? ''}`),
             ),
             h('div', { className: 'csh-settings' },
-              h('div', { className: 'csh-field' },
+              ccSwitchInstalled ? h('div', { className: 'csh-field' },
                 h('label', { className: 'csh-label' }, tr('ccSwitchDir')),
                 h('div', { className: 'csh-check-row', style: { alignItems: 'stretch' } },
                   h('input', { className: 'csh-input', value: ccSwitchDir, placeholder: snapshot.paths.ccSwitchDir, onChange: (event) => setCcSwitchDir(event.target.value) }),
@@ -1177,7 +1204,7 @@ window.__ModuleLoader__.load({
                 ),
                 h('div', { className: 'csh-note' }, tr('ccSwitchDirHint')),
                 configNote !== '' ? h('div', { className: 'csh-note' }, configNote) : null,
-              ),
+              ) : null,
               h('div', { className: 'csh-divider' }),
               h('div', { className: 'csh-setting-row' },
                 h('div', { className: 'csh-master-name' }, tr('masterMcp')),
