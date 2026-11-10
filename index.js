@@ -890,22 +890,26 @@ export function apply(ctx, rawConfig) {
         throw new Error('该 MCP 不在 profile patch 中，无法从面板删除；请编辑对应的 cordis.yml')
       }
       await fs.promises.writeFile(editor.documentPath, removal.text, { mode: 0o600 })
-      let reloaded = false
-      let warning
+      // Reload after the response so removing a row from the profile does not
+      // cut off this HTTP request when the profile is recomposed.
       const manager = ctx.get?.('pluginManager')
-      try {
-        if (manager && typeof manager.reload === 'function') {
-          await manager.reload([])
-          reloaded = true
+      const reloadTimer = setTimeout(() => {
+        try {
+          manager?.reload?.([]).catch((error) => {
+            logger?.warn?.(`[ccswitch-hub] reload after delete failed: ${errorMessage(error)}`)
+          })
+        } catch (error) {
+          logger?.warn?.(`[ccswitch-hub] reload after delete failed: ${errorMessage(error)}`)
         }
-      } catch (error) {
-        warning = `配置已删除，但重新加载失败：${errorMessage(error)}；请重启 Harness。`
-      }
+      }, 400)
+      reloadTimer.unref?.()
       const payload = statePayload()
-      if (payload.mcp.harness.some((server) => server.entryId === String(entry.id))) {
-        warning = '配置已删除，请重启 Harness 使列表更新。'
-      }
-      sendJson(res, 200, { ...payload, deleted: true, reloaded, warning })
+      sendJson(res, 200, {
+        ...payload,
+        deleted: true,
+        reloaded: false,
+        warning: '配置已删除，正在重新加载；若列表未更新请重启 Harness。',
+      })
     } catch (error) {
       sendJson(res, 400, { ok: false, error: truncate(errorMessage(error), 800) })
     }

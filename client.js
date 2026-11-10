@@ -944,7 +944,11 @@ window.__ModuleLoader__.load({
           ))
       }
 
-      const nativeMcp = snapshot.mcp.items.map((item) => ({ ...item, kind: 'native' }))
+      const nativeMcp = snapshot.mcp.items.map((item) => ({
+        ...item,
+        kind: 'native',
+        source: item.source?.type === 'ccswitch' && !ccSwitchInstalled ? null : item.source,
+      }))
       const harnessMcp = snapshot.mcp.harness ?? []
       const harnessRows = harnessMcp.filter((server) => !deletedHarness.includes(server.entryId)).map((server) => ({
         kind: 'harness',

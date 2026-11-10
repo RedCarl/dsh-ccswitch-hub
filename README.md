@@ -107,6 +107,6 @@ node --test
 （`npm.carljoy.cn` 的发布 token）。发布前先更新 `package.json` 的 `version` 并提交：
 
 ```bash
-git tag v2.2.2
-git push origin v2.2.2
+git tag v2.2.3
+git push origin v2.2.3
 ```
