@@ -10,7 +10,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { scanCcSwitch } from './lib/ccswitch.js'
-import { removeMcpClientRow } from './lib/harness-config.js'
+import { removeMcpClientRow, setMcpClientRowDisabled } from './lib/harness-config.js'
 import { McpRuntime, listMcpToolServers, runtimeServerName, summarizeMcp } from './lib/mcp.js'
 import { deleteSkill, importSkill, scanSkills, setSkillEnabled } from './lib/native-skills.js'
 import { resolvePaths, stringValue } from './lib/paths.js'
@@ -846,17 +846,40 @@ export function apply(ctx, rawConfig) {
       const entry = findHarnessEntry(body.entryId)
       if (entry === undefined) throw new Error('找不到该 Harness MCP 条目')
       const manager = ctx.get?.('pluginManager')
+      const enabled = body.enabled === true
+      const editor = ctx.get?.('configEditor')
+      const patchId = typeof entry.options?.id === 'string' ? entry.options.id : undefined
+      if (editor && typeof editor.documentPath === 'string' && patchId !== undefined) {
+        const source = await fs.promises.readFile(editor.documentPath, 'utf8')
+        const change = setMcpClientRowDisabled(source, patchId, !enabled)
+        if (change.updated === true) {
+          await fs.promises.writeFile(editor.documentPath, change.text, { mode: 0o600 })
+          let reloadError
+          try {
+            if (manager && typeof manager.reload === 'function') await manager.reload([])
+          } catch (error) {
+            reloadError = errorMessage(error)
+            logger?.warn?.(`[ccswitch-hub] reload after toggle failed: ${reloadError}`)
+          }
+          const payload = statePayload()
+          const target = payload.mcp.harness.find((server) => server.entryId === String(entry.id)
+            || server.serverName === (stringValue(entry.options?.config?.serverName) ?? ''))
+          if (target !== undefined && target.enabled !== enabled) {
+            throw new Error('开关已写入，但被更高优先级的 profile 配置覆盖')
+          }
+          sendJson(res, 200, reloadError ? { ...payload, warning: `配置已写入，但重新加载失败：${reloadError}` } : payload)
+          return
+        }
+      }
       if (!manager || typeof manager.setPluginEnabled !== 'function') {
         throw new Error('当前 Host 不支持修改 Harness 配置')
       }
       const rows = await manager.listPlugins()
-      const patchId = typeof entry.options?.id === 'string' ? entry.options.id : undefined
       const row = rows.find((candidate) => candidate.entryId === String(entry.id)
         || candidate.entryId === patchId
         || candidate.patchId === patchId)
       if (row === undefined) throw new Error('该 MCP 不在 profile 的可管理行中')
       if (row.readOnlyReason !== undefined) throw new Error(`该 MCP 不可修改：${row.readOnlyReason}`)
-      const enabled = body.enabled === true
       const result = await manager.setPluginEnabled(row.entryId, enabled)
       if (result?.application === 'failed' || result?.application === 'cancelled') {
         throw new Error(result.error?.diagnostic ?? result.error?.code ?? '修改 Harness MCP 状态失败')

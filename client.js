@@ -883,9 +883,13 @@ window.__ModuleLoader__.load({
         if (payload !== null) setEditor(null)
       }
       const toggleMcp = (item, enabled) => { void act(`${API}/mcp-toggle`, { id: item.id, enabled }, `mcp:${item.id}`) }
-      const toggleHarnessMcp = (server, enabled) => {
+      const toggleHarnessMcp = async (server, enabled) => {
         if (typeof server.entryId !== 'string') return
-        void act(`${API}/harness-mcp-toggle`, { entryId: server.entryId, enabled }, `harness:${server.entryId}`)
+        const payload = await act(`${API}/harness-mcp-toggle`, { entryId: server.entryId, enabled }, `harness:${server.entryId}`)
+        if (payload !== null) {
+          if (payload.warning) setNotice(payload.warning)
+          setTimeout(() => { void load() }, 1200)
+        }
       }
       const deleteMcp = async (item) => {
         const payload = await act(`${API}/mcp-delete`, { id: item.id }, `mcp:${item.id}`)
